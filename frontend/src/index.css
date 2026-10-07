@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50
+      dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white shadow-sm hover:bg-red-700;
+  }
+  .btn-success {
+    @apply btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+  .icon-btn {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100
+      hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200;
+  }
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30
+      disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:disabled:bg-slate-800;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
+  }
+  .hint {
+    @apply mt-1 text-xs text-slate-500 dark:text-slate-400;
+  }
+  .field-error {
+    @apply mt-1 text-xs text-red-600 dark:text-red-400;
+  }
+  .card {
+    @apply min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+  }
+  .card-header {
+    @apply flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800;
+  }
+  .card-title {
+    @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition;
+  }
+  .chip-on {
+    @apply chip border-brand-600 bg-brand-600 text-white;
+  }
+  .chip-off {
+    @apply chip border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900
+      dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+}
+
+/* ─── FullCalendar theming (light + dark) ─────────────────────────────── */
+.fc {
+  --fc-border-color: theme('colors.slate.200');
+  --fc-page-bg-color: theme('colors.white');
+  --fc-neutral-bg-color: theme('colors.slate.50');
+  --fc-today-bg-color: theme('colors.brand.50');
+  --fc-list-event-hover-bg-color: theme('colors.slate.100');
+  --fc-button-bg-color: theme('colors.white');
+  --fc-button-border-color: theme('colors.slate.300');
+  --fc-button-text-color: theme('colors.slate.700');
+  --fc-button-hover-bg-color: theme('colors.slate.100');
+  --fc-button-hover-border-color: theme('colors.slate.300');
+  --fc-button-active-bg-color: theme('colors.brand.600');
+  --fc-button-active-border-color: theme('colors.brand.600');
+  --fc-event-border-color: transparent;
+  font-size: 0.85rem;
+}
+.dark .fc {
+  --fc-border-color: theme('colors.slate.800');
+  --fc-page-bg-color: theme('colors.slate.900');
+  --fc-neutral-bg-color: theme('colors.slate.800');
+  --fc-today-bg-color: rgb(79 70 229 / 0.15);
+  --fc-list-event-hover-bg-color: theme('colors.slate.800');
+  --fc-button-bg-color: theme('colors.slate.800');
+  --fc-button-border-color: theme('colors.slate.700');
+  --fc-button-text-color: theme('colors.slate.200');
+  --fc-button-hover-bg-color: theme('colors.slate.700');
+  --fc-button-hover-border-color: theme('colors.slate.600');
+}
+.fc .fc-button {
+  @apply rounded-lg text-sm font-medium capitalize shadow-sm;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  color: white;
+}
+.fc .fc-toolbar-title {
+  @apply text-lg font-semibold;
+}
+.fc .fc-daygrid-event {
+  @apply cursor-pointer rounded-md;
+}
+.fc-event.is-done {
+  opacity: 0.55;
+}
+.fc-event.is-done .fc-event-title,
+.fc-event.is-done .fc-list-event-title {
+  text-decoration: line-through;
+}
+.fc-event.is-overdue {
+  box-shadow: inset 3px 0 0 theme('colors.red.600');
+}
+.fc .fc-list-day-cushion {
+  @apply bg-slate-50 dark:bg-slate-800;
+}
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    @apply flex-col gap-2;
+  }
+  .fc .fc-toolbar-title {
+    @apply text-base;
+  }
+  .fc .fc-list-table td {
+    padding: 6px 8px;
+  }
+  .fc .fc-list-event-time {
+    white-space: normal;
+    width: 4.75rem;
+  }
+  .fc .fc-list-event-graphic {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

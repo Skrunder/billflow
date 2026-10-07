@@ -1,0 +1,161 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SKR's Bill Calendar — self-hosted stack
+#
+#   cp .env.example .env      # set POSTGRES_PASSWORD (and APP_URL)
+#   docker compose up -d      # open http://<host>:8080
+#
+# Optional automatic database backups:
+#   docker compose --profile backup up -d
+# ─────────────────────────────────────────────────────────────────────────────
+name: skr-bill-calendar
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    <<: *hardening
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-billcalendar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (copy .env.example to .env)}
+      POSTGRES_DB: ${POSTGRES_DB:-billcalendar}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - ${DB_DATA_PATH:-db_data}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - internal
+
+  # ── Backend API ───────────────────────────────────────────────────────────
+  backend:
+    <<: *hardening
+    build:
+      context: ./backend
+    image: ${BACKEND_IMAGE:-skr-bill-calendar-backend:latest}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      TZ: UTC
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-billcalendar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-billcalendar}
+      JWT_SECRET: ${JWT_SECRET:-}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-UTC}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-15}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-1000}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-SKR's Bill Calendar <no-reply@localhost>}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
+      OCCURRENCE_HORIZON_DAYS: ${OCCURRENCE_HORIZON_DAYS:-400}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    volumes:
+      # Generated secrets and (future) uploaded files.
+      - ${APP_DATA_PATH:-backend_data}:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    networks:
+      - internal
+
+  # ── Web frontend (static PWA + /api reverse proxy) ────────────────────────
+  frontend:
+    <<: *hardening
+    build:
+      context: ./frontend
+    image: ${FRONTEND_IMAGE:-skr-bill-calendar-frontend:latest}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:4000
+    ports:
+      - "${APP_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    cap_drop:
+      - ALL
+    networks:
+      - internal
+
+  # ── Optional: scheduled pg_dump backups (enable with --profile backup) ────
+  backup:
+    <<: *hardening
+    image: postgres:16-alpine
+    profiles: ["backup"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-billcalendar}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-billcalendar}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ${BACKUP_PATH:-./backups}:/backups:z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "[backup] every $${BACKUP_INTERVAL_HOURS}h, keeping $${BACKUP_KEEP_DAYS} days of dumps in /backups"
+        while true; do
+          f="/backups/billcalendar-$$(date -u +%Y%m%dT%H%M%SZ).dump"
+          if pg_dump --format=custom --file="$$f.partial"; then
+            mv "$$f.partial" "$$f"
+            echo "[backup] wrote $$f ($$(du -h "$$f" | cut -f1))"
+          else
+            rm -f "$$f.partial"
+            echo "[backup] ERROR: pg_dump failed" >&2
+          fi
+          find /backups -name 'billcalendar-*.dump' -mtime +$${BACKUP_KEEP_DAYS} -delete
+          sleep $$(( $${BACKUP_INTERVAL_HOURS} * 3600 ))
+        done
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  db_data:
+  backend_data:

@@ -1,0 +1,429 @@
+// SKR's Bill Calendar — database schema
+//
+// Core design rule: recurring *templates* (Bill, Event) are stored separately
+// from their *occurrences* (BillOccurrence, EventOccurrence). Every occurrence
+// is its own row with its own status, completion data and audit trail, so
+// completing one occurrence can never affect another.
+//
+// Date handling:
+//   * Calendar dates (due date, event date) are stored as DATE columns holding
+//     the user's *local* calendar day. A bill due "the 15th" stays due on the
+//     15th no matter which timezone the user later picks.
+//   * Instants (dueAt, startAt, reminders, audit timestamps) are stored as
+//     timestamptz in UTC and derived from date + time + user timezone.
+//     They are recomputed when the user changes timezone.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────── Enums ──
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+enum CategoryType {
+  BILL
+  EVENT
+}
+
+enum PaymentMethod {
+  MANUAL
+  AUTOPAY
+  SCHEDULED_AUTOPAY
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+/// OVERDUE is not stored: it is derived at read time (PENDING + due date
+/// before "today" in the user's timezone) so there is a single source of truth.
+enum BillOccurrenceStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum EventOccurrenceStatus {
+  UPCOMING
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum TokenType {
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+// ─────────────────────────────────────────────────────────────── Users ──
+
+model User {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique
+  passwordHash     String    @map("password_hash")
+  displayName      String    @map("display_name")
+  role             UserRole  @default(USER)
+  isActive         Boolean   @default(true) @map("is_active")
+  emailVerifiedAt  DateTime? @map("email_verified_at")
+  /// Incremented to invalidate every outstanding access token for this user.
+  tokenVersion     Int       @default(0) @map("token_version")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+  lastLoginAt      DateTime? @map("last_login_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  settings           UserSettings?
+  sessions           Session[]
+  tokens             VerificationToken[]
+  categories         Category[]
+  bills              Bill[]
+  billOccurrences    BillOccurrence[]
+  events             Event[]
+  eventOccurrences   EventOccurrence[]
+  notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  userId                String          @id @map("user_id") @db.Uuid
+  timezone              String          @default("UTC")
+  theme                 ThemePreference @default(SYSTEM)
+  /// 0 = Sunday … 6 = Saturday
+  weekStartsOn          Int             @default(0) @map("week_starts_on")
+  currency              String          @default("USD")
+  locale                String          @default("en-US")
+  timeFormat            String          @default("12h") @map("time_format")
+  defaultCalendarView   String          @default("dayGridMonth") @map("default_calendar_view")
+  /// Minutes-before offsets applied to new bills / events.
+  defaultBillReminders  Int[]           @default([1440]) @map("default_bill_reminders")
+  defaultEventReminders Int[]           @default([60]) @map("default_event_reminders")
+  /// Local time (HH:mm) used for reminders / auto-pay on items without a time.
+  allDayReminderTime    String          @default("09:00") @map("all_day_reminder_time")
+  autoCompleteAutopay   Boolean         @default(true) @map("auto_complete_autopay")
+  inAppNotifications    Boolean         @default(true) @map("in_app_notifications")
+  emailNotifications    Boolean         @default(false) @map("email_notifications")
+  pushNotifications     Boolean         @default(false) @map("push_notifications")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+/// Refresh-token sessions. Only a SHA-256 hash of the token is stored.
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  /// All tokens produced by rotating one login share a family. Re-use of a
+  /// rotated token revokes the whole family (token theft detection).
+  familyId   String    @map("family_id") @db.Uuid
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime  @default(now()) @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      TokenType
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("verification_tokens")
+}
+
+// ────────────────────────────────────────────────────────── Categories ──
+
+model Category {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  name      String
+  type      CategoryType
+  color     String       @default("#6366f1")
+  icon      String?
+  sortOrder Int          @default(0) @map("sort_order")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bills  Bill[]
+  events Event[]
+
+  @@unique([userId, type, name])
+  @@index([userId, type])
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────────────────────────── Bills ──
+
+/// A bill *template*. One-time bills are templates without recurrence that
+/// produce exactly one occurrence.
+model Bill {
+  id                     String               @id @default(uuid()) @db.Uuid
+  userId                 String               @map("user_id") @db.Uuid
+  categoryId             String?              @map("category_id") @db.Uuid
+  name                   String
+  description            String?
+  notes                  String?
+  amount                 Decimal              @db.Decimal(12, 2)
+  paymentMethod          PaymentMethod        @default(MANUAL) @map("payment_method")
+  /// For SCHEDULED_AUTOPAY: payment executes this many days before the due date.
+  scheduledPayDaysBefore Int?                 @map("scheduled_pay_days_before")
+  /// First (or only) due date — a local calendar date.
+  startDate              DateTime             @map("start_date") @db.Date
+  /// Optional local due time HH:mm. Null = all-day.
+  dueTime                String?              @map("due_time")
+  // Recurrence (null frequency = one-time). Maps 1:1 to RFC 5545 RRULE.
+  recurrenceFrequency    RecurrenceFrequency? @map("recurrence_frequency")
+  recurrenceInterval     Int                  @default(1) @map("recurrence_interval")
+  /// WEEKLY only: 0 = Sunday … 6 = Saturday.
+  recurrenceByWeekday    Int[]                @default([]) @map("recurrence_by_weekday")
+  recurrenceEndDate      DateTime?            @map("recurrence_end_date") @db.Date
+  recurrenceCount        Int?                 @map("recurrence_count")
+  /// Reminder offsets in minutes before the due instant.
+  reminderOffsets        Int[]                @default([]) @map("reminder_offsets")
+  /// Occurrences have been materialised up to (and including) this date.
+  generatedUntil         DateTime?            @map("generated_until") @db.Date
+  isArchived             Boolean              @default(false) @map("is_archived")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  occurrences BillOccurrence[]
+
+  @@index([userId, isArchived])
+  @@index([categoryId])
+  @@map("bills")
+}
+
+/// One independent instance of a bill. Never shares state with siblings.
+model BillOccurrence {
+  id                 String               @id @default(uuid()) @db.Uuid
+  billId             String               @map("bill_id") @db.Uuid
+  /// Denormalised owner for fast, isolated per-user queries.
+  userId             String               @map("user_id") @db.Uuid
+  /// The schedule slot this occurrence was generated for. Never changes, so
+  /// regeneration can't duplicate an occurrence the user moved.
+  originalDueDate    DateTime             @map("original_due_date") @db.Date
+  /// Effective local due date (may be moved by the user).
+  dueDate            DateTime             @map("due_date") @db.Date
+  dueTime            String?              @map("due_time")
+  /// UTC instant derived from dueDate + dueTime (or all-day reminder time).
+  dueAt              DateTime             @map("due_at")
+  amount             Decimal              @db.Decimal(12, 2)
+  status             BillOccurrenceStatus @default(PENDING)
+  completedAt        DateTime?            @map("completed_at")
+  amountPaid         Decimal?             @map("amount_paid") @db.Decimal(12, 2)
+  confirmationNumber String?              @map("confirmation_number")
+  notes              String?
+  /// Local date auto-pay runs (AUTOPAY = due date, SCHEDULED = earlier).
+  scheduledPayDate   DateTime?            @map("scheduled_pay_date") @db.Date
+  /// UTC instant the auto-pay job will auto-complete this occurrence.
+  autopayAt          DateTime?            @map("autopay_at")
+  /// True once the user edits this occurrence directly; template edits will
+  /// then never overwrite it.
+  isModified         Boolean              @default(false) @map("is_modified")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  bill          Bill           @relation(fields: [billId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@unique([billId, originalDueDate])
+  @@index([userId, dueDate])
+  @@index([userId, status, dueDate])
+  @@index([status, dueAt])
+  @@index([status, autopayAt])
+  @@map("bill_occurrences")
+}
+
+// ────────────────────────────────────────────────────────────── Events ──
+
+/// Calendar event template. Events are informational only and never take part
+/// in any financial totals.
+model Event {
+  id                  String               @id @default(uuid()) @db.Uuid
+  userId              String               @map("user_id") @db.Uuid
+  categoryId          String?              @map("category_id") @db.Uuid
+  title               String
+  description         String?
+  notes               String?
+  location            String?
+  startDate           DateTime             @map("start_date") @db.Date
+  /// Optional local times HH:mm. startTime null = all-day event.
+  startTime           String?              @map("start_time")
+  endTime             String?              @map("end_time")
+  recurrenceFrequency RecurrenceFrequency? @map("recurrence_frequency")
+  recurrenceInterval  Int                  @default(1) @map("recurrence_interval")
+  recurrenceByWeekday Int[]                @default([]) @map("recurrence_by_weekday")
+  recurrenceEndDate   DateTime?            @map("recurrence_end_date") @db.Date
+  recurrenceCount     Int?                 @map("recurrence_count")
+  reminderOffsets     Int[]                @default([]) @map("reminder_offsets")
+  generatedUntil      DateTime?            @map("generated_until") @db.Date
+  isArchived          Boolean              @default(false) @map("is_archived")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  occurrences EventOccurrence[]
+
+  @@index([userId, isArchived])
+  @@index([categoryId])
+  @@map("events")
+}
+
+model EventOccurrence {
+  id           String                @id @default(uuid()) @db.Uuid
+  eventId      String                @map("event_id") @db.Uuid
+  userId       String                @map("user_id") @db.Uuid
+  originalDate DateTime              @map("original_date") @db.Date
+  eventDate    DateTime              @map("event_date") @db.Date
+  startTime    String?               @map("start_time")
+  endTime      String?               @map("end_time")
+  /// UTC instants derived from eventDate + times in the user's timezone.
+  startAt      DateTime              @map("start_at")
+  endAt        DateTime?             @map("end_at")
+  status       EventOccurrenceStatus @default(UPCOMING)
+  completedAt  DateTime?             @map("completed_at")
+  cancelledAt  DateTime?             @map("cancelled_at")
+  notes        String?
+  isModified   Boolean               @default(false) @map("is_modified")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@unique([eventId, originalDate])
+  @@index([userId, eventDate])
+  @@index([userId, status, eventDate])
+  @@index([status, startAt])
+  @@map("event_occurrences")
+}
+
+// ─────────────────────────────────────────────────────── Notifications ──
+
+/// One reminder delivery for one occurrence, offset and channel. The unique
+/// keys make reminder generation idempotent.
+model Notification {
+  id                String              @id @default(uuid()) @db.Uuid
+  userId            String              @map("user_id") @db.Uuid
+  channel           NotificationChannel
+  status            NotificationStatus  @default(PENDING)
+  billOccurrenceId  String?             @map("bill_occurrence_id") @db.Uuid
+  eventOccurrenceId String?             @map("event_occurrence_id") @db.Uuid
+  offsetMinutes     Int                 @map("offset_minutes")
+  scheduledFor      DateTime            @map("scheduled_for")
+  title             String
+  body              String
+  url               String?
+  attempts          Int                 @default(0)
+  lastError         String?             @map("last_error")
+  sentAt            DateTime?           @map("sent_at")
+  readAt            DateTime?           @map("read_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  billOccurrence  BillOccurrence?  @relation(fields: [billOccurrenceId], references: [id], onDelete: Cascade)
+  eventOccurrence EventOccurrence? @relation(fields: [eventOccurrenceId], references: [id], onDelete: Cascade)
+
+  @@unique([billOccurrenceId, offsetMinutes, channel])
+  @@unique([eventOccurrenceId, offsetMinutes, channel])
+  @@index([userId, channel, readAt])
+  @@index([status, channel, scheduledFor])
+  @@map("notifications")
+}
+
+/// Web Push (VAPID) subscriptions — one per browser/device.
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+// ────────────────────────────────────────────────────────── Audit logs ──
+
+/// Append-only history. Intentionally has no foreign key to the audited
+/// entity so history survives deletion of the entity itself.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  /// USER | SYSTEM
+  actorType  String   @default("USER") @map("actor_type")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  changes    Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}

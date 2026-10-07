@@ -1,0 +1,71 @@
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json' with { type: 'json' };
+
+export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  plugins: [
+    react(),
+    VitePWA({
+      // Custom service worker (src/sw.ts) so we can handle Web Push events.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      registerType: 'autoUpdate',
+      injectRegister: false,
+      includeAssets: ['favicon.svg', 'theme-init.js', 'icons/apple-touch-icon.png'],
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
+      manifest: {
+        id: '/',
+        name: "SKR's Bill Calendar",
+        short_name: 'Bill Calendar',
+        description: 'Track bills, recurring payments and events — self-hosted.',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'any',
+        background_color: '#0f172a',
+        theme_color: '#4f46e5',
+        categories: ['finance', 'productivity'],
+        icons: [
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        shortcuts: [
+          { name: 'Add bill', url: '/bills/new', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Calendar', url: '/calendar', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+        ],
+      },
+      devOptions: { enabled: false },
+    }),
+  ],
+  server: {
+    port: 5173,
+    proxy: { '/api': { target: process.env.VITE_API_PROXY ?? 'http://localhost:4000', changeOrigin: false } },
+  },
+  build: {
+    sourcemap: false,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          fullcalendar: [
+            '@fullcalendar/core',
+            '@fullcalendar/react',
+            '@fullcalendar/daygrid',
+            '@fullcalendar/timegrid',
+            '@fullcalendar/list',
+            '@fullcalendar/interaction',
+            '@fullcalendar/luxon3',
+          ],
+          vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'luxon'],
+        },
+      },
+    },
+  },
+});
