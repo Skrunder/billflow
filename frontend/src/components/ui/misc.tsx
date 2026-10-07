@@ -104,6 +104,7 @@ export function Segmented<T extends string>({
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
       {options.map((o) => (
         <button
+          type="button"
           key={o.value}
           role="radio"
           aria-checked={value === o.value}
@@ -137,6 +138,7 @@ export function Toggle({ checked, onChange, label, description, disabled }: {
         {description && <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>}
       </div>
       <button
+        type="button"
         id={id}
         role="switch"
         aria-checked={checked}
