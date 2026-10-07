@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { AuthProvider } from './auth/AuthProvider';
+import { RepositoryProvider } from './data/RepositoryProvider';
 import { ToastProvider } from './components/ui/Toast';
 import './index.css';
 import { CACHE_MAX_AGE, persister, queryClient } from './queryClient';
@@ -23,7 +24,9 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <ToastProvider>
           <AuthProvider>
-            <App />
+            <RepositoryProvider>
+              <App />
+            </RepositoryProvider>
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>

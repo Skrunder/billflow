@@ -1,8 +1,9 @@
 import { Download, LogOut, Send, Smartphone, Tags } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { api, errorMessage } from '../api/client';
-import { useChangePassword, useMe, useServerConfig, useUpdateProfile, useUpdateSettings } from '../api/hooks';
+import { errorMessage } from '../api/client';
+import { useChangePassword, useExportData, useMe, useServerConfig, useUpdateProfile, useUpdateSettings } from '../api/hooks';
+import * as account from '../data/account';
 import type { CalendarView, Settings, Theme } from '@skr/core';
 import { useAuth } from '../auth/AuthProvider';
 import { ReminderEditor } from '../components/shared/ReminderEditor';
@@ -224,7 +225,7 @@ function NotificationSection({ settings: s, pushServer, emailServer, onSave }: {
 
   const sendTest = async () => {
     try {
-      const res = await api<Record<string, string>>('/notifications/test', { method: 'POST' });
+      const res = await account.sendTestNotification();
       toast.info(Object.entries(res).map(([k, v]) => `${k}: ${v}`).join('\n') || 'No channels enabled');
     } catch (err) {
       toast.error(errorMessage(err));
@@ -293,7 +294,7 @@ function SecuritySection({ onReauth }: { onReauth: () => void }) {
 
   const logoutAll = async () => {
     try {
-      await api('/auth/logout-all', { method: 'POST' });
+      await account.logoutEverywhere();
       toast.success('Signed out of all devices');
       onReauth();
     } catch (err) {
@@ -336,9 +337,10 @@ function DataSection({ onDeleted }: { onDeleted: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  const exporter = useExportData();
   const exportData = async () => {
     try {
-      const data = await api<unknown>('/users/me/export');
+      const data = await exporter.mutateAsync();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -356,7 +358,7 @@ function DataSection({ onDeleted }: { onDeleted: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api('/users/me', { method: 'DELETE', body: { password } });
+      await account.deleteAccount(password);
       onDeleted();
     } catch (err) {
       setError(new Error(errorMessage(err)));

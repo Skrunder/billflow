@@ -8,7 +8,7 @@ import { EventOccurrenceRow } from '../components/events/EventOccurrenceRow';
 import { CategoryDot, EmptyState, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useSettings } from '../hooks/useSettings';
-import { describeRecurrence, formatClock, formatDate, todayIn } from '@skr/core';
+import { describeRecurrence, formatClock, formatDate, todayIn, type EventOccurrenceQuery } from '@skr/core';
 
 type Tab = 'upcoming' | 'completed' | 'all';
 
@@ -24,7 +24,7 @@ export function EventsPage() {
 
   const today = todayIn(settings.timezone);
   const horizon = DateTime.fromISO(today).plus({ days: 90 }).toISODate()!;
-  const occQuery =
+  const occQuery: EventOccurrenceQuery =
     tab === 'upcoming'
       ? { start: today, end: horizon, status: 'UPCOMING', categoryId }
       : { status: 'COMPLETED', order: 'desc', limit: 100, categoryId };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, errorMessage } from '../../api/client';
+import { errorMessage } from '../../api/client';
+import * as account from '../../data/account';
 import { useServerConfig } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthProvider';
 import { ErrorNotice, Field } from '../../components/ui/misc';
@@ -168,7 +169,7 @@ export function ForgotPasswordPage() {
     setBusy(true);
     setError(null);
     try {
-      await api('/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
+      await account.requestPasswordReset(email);
       setSent(true);
     } catch (err) {
       setError(new Error(errorMessage(err)));
@@ -214,7 +215,7 @@ export function ResetPasswordPage() {
     setBusy(true);
     setError(null);
     try {
-      await api('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false });
+      await account.resetPassword(token, password);
       setDone(true);
     } catch (err) {
       setError(new Error(errorMessage(err)));
@@ -260,7 +261,8 @@ export function VerifyEmailPage() {
       setMessage('This verification link is missing its token.');
       return;
     }
-    api('/auth/verify-email', { method: 'POST', body: { token }, auth: false })
+    account
+      .verifyEmail(token)
       .then(() => setState('ok'))
       .catch((err) => {
         setState('error');

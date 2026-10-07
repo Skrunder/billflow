@@ -112,7 +112,8 @@ main.tsx
    └─ BrowserRouter
       └─ ToastProvider
          └─ AuthProvider (session: loading | authenticated | offline | anonymous)
-            └─ App (routes)
+            └─ RepositoryProvider (DataRepository: remote today, local on Android)
+               └─ App (routes)
                ├─ Public: LoginPage · RegisterPage · ForgotPasswordPage · ResetPasswordPage · VerifyEmailPage
                └─ RequireAuth → AppLayout (sidebar · header [bell, quick-add] · bottom nav · offline banner · theme sync)
                   ├─ DashboardPage ── StatCard · BillOccurrenceRow · EventOccurrenceRow · *OccurrenceDialog
@@ -126,7 +127,11 @@ main.tsx
                   └─ SettingsPage ── Profile · Region & time · Appearance · Reminders · Notifications (push) · Security · Data
 ```
 
-* **Data layer:** `src/api/client.ts` is a fetch wrapper with an in-memory access token, single-flight silent refresh on 401, and a 409 multi-tab retry. `src/api/hooks.ts` holds every query and mutation. Mutations invalidate all dependent views (dashboard, calendar, lists, history).
+* **Data layer:** screens never call HTTP directly. They use the React Query hooks in `src/api/hooks.ts`, which call a **`DataRepository`** (`src/data/repository.ts`) supplied by `<RepositoryProvider>`:
+  * `RemoteRepository` (`src/data/remote.ts`) maps each method to exactly one REST call, and a contract test pins every request. The web app uses it.
+  * A `LocalRepository` backed by the on-device database will implement the same interface for the Android app.
+
+  Server-only account features (sign-in, registration, password reset, email verification, sign out everywhere, account deletion, test notifications) live in `src/data/account.ts`, and push subscriptions in `src/lib/push.ts`, so a standalone install can hide them. `src/api/client.ts` is the fetch wrapper: in-memory access token, single-flight silent refresh on 401, and a 409 multi-tab retry. Mutations invalidate all dependent views (dashboard, calendar, lists, history).
 * **Offline:** the service worker precaches the app shell. Query results are persisted to localStorage per user and wiped on sign-out or account switch. When the server is unreachable at startup, the app opens in read-only *offline* mode with the cached data and reconnects automatically.
 * **UI kit:** Tailwind component classes (`btn-*`, `input`, `card`, `chip`) plus `Modal` (focus trap, Escape, bottom sheet on mobile), `ConfirmDialog`, `Toast`, `Segmented`, `Toggle`, `Field` (label/hint/error wiring).
 * **Accessibility:** semantic landmarks, skip link, labelled controls, `role=dialog` with `aria-modal`, `role=switch` and `radiogroup`, visible focus rings, live regions for toasts, and colour never the only status signal (badges carry text).
@@ -168,7 +173,8 @@ main.tsx
     ├── public/                 # icons, favicon, theme-init.js
     └── src/
         ├── main.tsx · App.tsx · sw.ts · queryClient.ts · index.css
-        ├── api/                # client, hooks (types come from @skr/core)
+        ├── api/                # HTTP client + React Query hooks (types come from @skr/core)
+        ├── data/               # DataRepository interface, RemoteRepository, account (server-only), provider
         ├── auth/AuthProvider.tsx
         ├── hooks/              # settings/theme/online, canEdit
         ├── lib/                # push

@@ -236,3 +236,117 @@ export interface HistoryEntry {
   changes: Record<string, { from: unknown; to: unknown }> | null;
   createdAt: string;
 }
+
+// ───────────────────────────────────────── request & query shapes ──
+// Shared by every data source (server API today, on-device database next).
+
+export type RecurrenceInputValue = Omit<Recurrence, 'rrule'>;
+
+export interface ProfileData {
+  user: User;
+  settings: Settings;
+}
+
+export interface CategoryInput {
+  name: string;
+  type: CategoryType;
+  color: string;
+}
+
+export type CategoryUpdate = Partial<Pick<CategoryInput, 'name' | 'color'>>;
+
+export interface BillInput {
+  name: string;
+  description: string | null;
+  notes: string | null;
+  amount: string;
+  categoryId: string | null;
+  paymentMethod: PaymentMethod;
+  scheduledPayDaysBefore: number | null;
+  startDate: string;
+  dueTime: string | null;
+  recurrence: RecurrenceInputValue | null;
+  reminderOffsets: number[];
+}
+
+export interface EventInput {
+  title: string;
+  description: string | null;
+  notes: string | null;
+  location: string | null;
+  categoryId: string | null;
+  startDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  recurrence: RecurrenceInputValue | null;
+  reminderOffsets: number[];
+}
+
+/** Filters for template lists. Empty strings mean "no filter". */
+export interface TemplateListQuery {
+  search?: string;
+  categoryId?: string;
+  archived?: 'true' | 'false' | 'all';
+  recurring?: 'true' | 'false';
+}
+
+export interface BillOccurrenceQuery {
+  start?: string;
+  end?: string;
+  status?: BillStatus;
+  billId?: string;
+  categoryId?: string;
+  order?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface EventOccurrenceQuery {
+  start?: string;
+  end?: string;
+  status?: EventStatus;
+  eventId?: string;
+  categoryId?: string;
+  order?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface CompleteBillBody {
+  completedAt?: string;
+  amountPaid?: string | null;
+  confirmationNumber?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateBillOccurrenceBody {
+  dueDate?: string;
+  dueTime?: string | null;
+  amount?: string;
+  notes?: string | null;
+  confirmationNumber?: string | null;
+}
+
+export interface NotesBody {
+  notes?: string | null;
+}
+
+export interface UpdateEventOccurrenceBody {
+  eventDate?: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  notes?: string | null;
+}
+
+export type CalendarFilter = 'all' | 'bills' | 'events';
+
+export interface CalendarFeed {
+  timezone: string;
+  today: string;
+  items: CalendarItem[];
+}
+
+export type HistoryKind = 'bills' | 'bill-occurrences' | 'events' | 'event-occurrences';
+
+export interface NotificationQuery {
+  unreadOnly?: boolean;
+  limit?: number;
+}

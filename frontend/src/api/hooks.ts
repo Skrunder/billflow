@@ -1,23 +1,31 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { api } from './client';
 import type {
-  AppNotification,
-  Bill,
-  BillOccurrence,
-  CalendarEvent,
-  CalendarItem,
-  Category,
+  BillInput,
+  BillOccurrenceQuery,
+  CalendarFilter,
+  CategoryInput,
   CategoryType,
-  Dashboard,
-  EventOccurrence,
-  HistoryEntry,
-  Recurrence,
-  ServerConfig,
+  CompleteBillBody,
+  EventInput,
+  EventOccurrenceQuery,
+  HistoryKind,
+  NotesBody,
+  ProfileData,
   Settings,
-  User,
+  TemplateListQuery,
+  UpdateBillOccurrenceBody,
+  UpdateEventOccurrenceBody,
 } from '@skr/core';
+import * as account from '../data/account';
+import { useRepository } from '../data/RepositoryProvider';
 
-type Query = Record<string, string | number | boolean | undefined | null>;
+/**
+ * React Query hooks for every screen. All data access goes through the
+ * DataRepository from <RepositoryProvider>, so these hooks work unchanged
+ * against the server or the on-device database.
+ */
+
+export type { BillInput, CategoryInput, EventInput };
 
 /** Everything that may change when any bill / event data changes. */
 const DATA_KEYS = [
@@ -39,152 +47,140 @@ export function invalidateData(qc: QueryClient) {
   return Promise.all(DATA_KEYS.map((k) => qc.invalidateQueries({ queryKey: [k] })));
 }
 
-// ─────────────────────────────────────────────────── account ──
+// ─────────────────────────────────────────── account (server only) ──
 
 export const useServerConfig = () =>
-  useQuery({ queryKey: ['config'], queryFn: () => api<ServerConfig>('/auth/config', { auth: false }), staleTime: 60_000 });
+  useQuery({ queryKey: ['config'], queryFn: account.getServerConfig, staleTime: 60_000 });
 
-export const useMe = (enabled = true) =>
-  useQuery({
-    queryKey: ['me'],
-    queryFn: () => api<{ user: User; settings: Settings }>('/users/me'),
-    enabled,
-    staleTime: 5 * 60_000,
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      account.changePassword(body.currentPassword, body.newPassword),
   });
 
+// ──────────────────────────────────────────── profile & settings ──
+
+export const useMe = (enabled = true) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['me'], queryFn: () => repo.getProfile(), enabled, staleTime: 5 * 60_000 });
+};
+
 export function useUpdateSettings() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (s: Partial<Settings>) => api<Settings>('/users/settings', { method: 'PUT', body: s }),
+    mutationFn: (patch: Partial<Settings>) => repo.updateSettings(patch),
     onSuccess: (settings) => {
-      qc.setQueryData<{ user: User; settings: Settings }>(['me'], (old) => (old ? { ...old, settings } : old));
+      qc.setQueryData<ProfileData>(['me'], (old) => (old ? { ...old, settings } : old));
       return invalidateData(qc);
     },
   });
 }
 
 export function useUpdateProfile() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName: string }) => api<{ user: User }>('/users/me', { method: 'PATCH', body }),
-    onSuccess: ({ user }) =>
-      qc.setQueryData<{ user: User; settings: Settings }>(['me'], (old) => (old ? { ...old, user } : old)),
+    mutationFn: (body: { displayName: string }) => repo.updateProfile(body),
+    onSuccess: (user) => qc.setQueryData<ProfileData>(['me'], (old) => (old ? { ...old, user } : old)),
   });
 }
 
-export const useChangePassword = () =>
-  useMutation({
-    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
-      api<{ ok: boolean }>('/users/me/password', { method: 'POST', body }),
-  });
+// ──────────────────────────────────────────────────── categories ──
 
-// ──────────────────────────────────────────────── categories ──
-
-export const useCategories = (type?: CategoryType) =>
-  useQuery({
+export const useCategories = (type?: CategoryType) => {
+  const repo = useRepository();
+  return useQuery({
     queryKey: ['categories', type ?? 'all'],
-    queryFn: () => api<Category[]>('/categories', { query: { type } }),
+    queryFn: () => repo.listCategories(type),
     staleTime: 5 * 60_000,
   });
-
-export interface CategoryInput {
-  name: string;
-  type: CategoryType;
-  color: string;
-}
+};
 
 export function useSaveCategory() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...body }: Partial<CategoryInput> & { id?: string }) =>
       id
-        ? api<Category>(`/categories/${id}`, { method: 'PATCH', body: { name: body.name, color: body.color } })
-        : api<Category>('/categories', { method: 'POST', body }),
+        ? repo.updateCategory(id, { name: body.name, color: body.color })
+        : repo.createCategory(body as CategoryInput),
     onSuccess: () => invalidateData(qc),
   });
 }
 
 export function useDeleteCategory() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api<void>(`/categories/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) => repo.deleteCategory(id),
     onSuccess: () => invalidateData(qc),
   });
 }
 
-// ──────────────────────────────────────────────────── bills ──
+// ──────────────────────────────────────────────────────── bills ──
 
-export interface BillInput {
-  name: string;
-  description: string | null;
-  notes: string | null;
-  amount: string;
-  categoryId: string | null;
-  paymentMethod: Bill['paymentMethod'];
-  scheduledPayDaysBefore: number | null;
-  startDate: string;
-  dueTime: string | null;
-  recurrence: Omit<Recurrence, 'rrule'> | null;
-  reminderOffsets: number[];
-}
+export const useBills = (query: TemplateListQuery = {}) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['bills', query], queryFn: () => repo.listBills(query) });
+};
 
-export const useBills = (query: Query = {}) =>
-  useQuery({ queryKey: ['bills', query], queryFn: () => api<Bill[]>('/bills', { query }) });
-
-export const useBill = (id: string | undefined) =>
-  useQuery({ queryKey: ['bill', id], queryFn: () => api<Bill>(`/bills/${id}`), enabled: Boolean(id) });
+export const useBill = (id: string | undefined) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['bill', id], queryFn: () => repo.getBill(id!), enabled: Boolean(id) });
+};
 
 export function useSaveBill() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: BillInput }) =>
-      id ? api<Bill>(`/bills/${id}`, { method: 'PUT', body: input }) : api<Bill>('/bills', { method: 'POST', body: input }),
+    mutationFn: ({ id, input }: { id?: string; input: BillInput }) => (id ? repo.updateBill(id, input) : repo.createBill(input)),
     onSuccess: () => invalidateData(qc),
   });
 }
 
 export function useBillTemplateAction() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'archive' | 'unarchive' | 'delete' }) =>
-      action === 'delete'
-        ? api<unknown>(`/bills/${id}`, { method: 'DELETE' })
-        : api<unknown>(`/bills/${id}/${action}`, { method: 'POST' }),
+      action === 'delete' ? repo.deleteBill(id) : repo.setBillArchived(id, action === 'archive'),
     onSuccess: () => invalidateData(qc),
   });
 }
 
-export const useBillOccurrences = (query: Query, enabled = true) =>
-  useQuery({
-    queryKey: ['bill-occurrences', query],
-    queryFn: () => api<BillOccurrence[]>('/bill-occurrences', { query }),
-    enabled,
-  });
+export const useBillOccurrences = (query: BillOccurrenceQuery, enabled = true) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['bill-occurrences', query], queryFn: () => repo.listBillOccurrences(query), enabled });
+};
 
-export const useBillOccurrence = (id: string | null) =>
-  useQuery({
-    queryKey: ['bill-occurrence', id],
-    queryFn: () => api<BillOccurrence>(`/bill-occurrences/${id}`),
-    enabled: Boolean(id),
-  });
+export const useBillOccurrence = (id: string | null) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['bill-occurrence', id], queryFn: () => repo.getBillOccurrence(id!), enabled: Boolean(id) });
+};
 
 export type BillOccurrenceAction =
-  | { id: string; action: 'complete'; body?: { completedAt?: string; amountPaid?: string | null; confirmationNumber?: string | null; notes?: string | null } }
-  | { id: string; action: 'skip'; body?: { notes?: string | null } }
+  | { id: string; action: 'complete'; body?: CompleteBillBody }
+  | { id: string; action: 'skip'; body?: NotesBody }
   | { id: string; action: 'reopen' }
-  | {
-      id: string;
-      action: 'update';
-      body: { dueDate?: string; dueTime?: string | null; amount?: string; notes?: string | null; confirmationNumber?: string | null };
-    };
+  | { id: string; action: 'update'; body: UpdateBillOccurrenceBody };
 
 export function useBillOccurrenceAction() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (a: BillOccurrenceAction) =>
-      a.action === 'update'
-        ? api<BillOccurrence>(`/bill-occurrences/${a.id}`, { method: 'PATCH', body: a.body })
-        : api<BillOccurrence>(`/bill-occurrences/${a.id}/${a.action}`, { method: 'POST', body: 'body' in a ? (a.body ?? {}) : {} }),
+    mutationFn: (a: BillOccurrenceAction) => {
+      switch (a.action) {
+        case 'complete':
+          return repo.completeBillOccurrence(a.id, a.body);
+        case 'skip':
+          return repo.skipBillOccurrence(a.id, a.body);
+        case 'reopen':
+          return repo.reopenBillOccurrence(a.id);
+        case 'update':
+          return repo.updateBillOccurrence(a.id, a.body);
+      }
+    },
     onSuccess: (occ) => {
       qc.setQueryData(['bill-occurrence', occ.id], occ);
       return invalidateData(qc);
@@ -192,75 +188,68 @@ export function useBillOccurrenceAction() {
   });
 }
 
-// ─────────────────────────────────────────────────── events ──
+// ─────────────────────────────────────────────────────── events ──
 
-export interface EventInput {
-  title: string;
-  description: string | null;
-  notes: string | null;
-  location: string | null;
-  categoryId: string | null;
-  startDate: string;
-  startTime: string | null;
-  endTime: string | null;
-  recurrence: Omit<Recurrence, 'rrule'> | null;
-  reminderOffsets: number[];
-}
+export const useEvents = (query: TemplateListQuery = {}) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['events', query], queryFn: () => repo.listEvents(query) });
+};
 
-export const useEvents = (query: Query = {}) =>
-  useQuery({ queryKey: ['events', query], queryFn: () => api<CalendarEvent[]>('/events', { query }) });
-
-export const useEvent = (id: string | undefined) =>
-  useQuery({ queryKey: ['event', id], queryFn: () => api<CalendarEvent>(`/events/${id}`), enabled: Boolean(id) });
+export const useEvent = (id: string | undefined) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['event', id], queryFn: () => repo.getEvent(id!), enabled: Boolean(id) });
+};
 
 export function useSaveEvent() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: EventInput }) =>
-      id
-        ? api<CalendarEvent>(`/events/${id}`, { method: 'PUT', body: input })
-        : api<CalendarEvent>('/events', { method: 'POST', body: input }),
+    mutationFn: ({ id, input }: { id?: string; input: EventInput }) => (id ? repo.updateEvent(id, input) : repo.createEvent(input)),
     onSuccess: () => invalidateData(qc),
   });
 }
 
 export function useEventTemplateAction() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'archive' | 'unarchive' | 'delete' }) =>
-      action === 'delete'
-        ? api<unknown>(`/events/${id}`, { method: 'DELETE' })
-        : api<unknown>(`/events/${id}/${action}`, { method: 'POST' }),
+      action === 'delete' ? repo.deleteEvent(id) : repo.setEventArchived(id, action === 'archive'),
     onSuccess: () => invalidateData(qc),
   });
 }
 
-export const useEventOccurrences = (query: Query, enabled = true) =>
-  useQuery({
-    queryKey: ['event-occurrences', query],
-    queryFn: () => api<EventOccurrence[]>('/event-occurrences', { query }),
-    enabled,
-  });
+export const useEventOccurrences = (query: EventOccurrenceQuery, enabled = true) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['event-occurrences', query], queryFn: () => repo.listEventOccurrences(query), enabled });
+};
 
-export const useEventOccurrence = (id: string | null) =>
-  useQuery({
-    queryKey: ['event-occurrence', id],
-    queryFn: () => api<EventOccurrence>(`/event-occurrences/${id}`),
-    enabled: Boolean(id),
-  });
+export const useEventOccurrence = (id: string | null) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['event-occurrence', id], queryFn: () => repo.getEventOccurrence(id!), enabled: Boolean(id) });
+};
 
 export type EventOccurrenceAction =
-  | { id: string; action: 'complete' | 'cancel'; body?: { notes?: string | null } }
+  | { id: string; action: 'complete' | 'cancel'; body?: NotesBody }
   | { id: string; action: 'reopen' }
-  | { id: string; action: 'update'; body: { eventDate?: string; startTime?: string | null; endTime?: string | null; notes?: string | null } };
+  | { id: string; action: 'update'; body: UpdateEventOccurrenceBody };
 
 export function useEventOccurrenceAction() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (a: EventOccurrenceAction) =>
-      a.action === 'update'
-        ? api<EventOccurrence>(`/event-occurrences/${a.id}`, { method: 'PATCH', body: a.body })
-        : api<EventOccurrence>(`/event-occurrences/${a.id}/${a.action}`, { method: 'POST', body: 'body' in a ? (a.body ?? {}) : {} }),
+    mutationFn: (a: EventOccurrenceAction) => {
+      switch (a.action) {
+        case 'complete':
+          return repo.completeEventOccurrence(a.id, a.body);
+        case 'cancel':
+          return repo.cancelEventOccurrence(a.id, a.body);
+        case 'reopen':
+          return repo.reopenEventOccurrence(a.id);
+        case 'update':
+          return repo.updateEventOccurrence(a.id, a.body);
+      }
+    },
     onSuccess: (occ) => {
       qc.setQueryData(['event-occurrence', occ.id], occ);
       return invalidateData(qc);
@@ -268,47 +257,59 @@ export function useEventOccurrenceAction() {
   });
 }
 
-// ─────────────────────────────────────── calendar & dashboard ──
+// ───────────────────────────────────────── calendar & dashboard ──
 
-export const useCalendar = (start: string | null, end: string | null, type: 'all' | 'bills' | 'events') =>
-  useQuery({
-    queryKey: ['calendar', start, end, type],
-    queryFn: () =>
-      api<{ timezone: string; today: string; items: CalendarItem[] }>('/calendar', { query: { start, end, type } }),
+export const useCalendar = (start: string | null, end: string | null, filter: CalendarFilter) => {
+  const repo = useRepository();
+  return useQuery({
+    queryKey: ['calendar', start, end, filter],
+    queryFn: () => repo.getCalendar(start!, end!, filter),
     enabled: Boolean(start && end),
     placeholderData: (prev) => prev,
   });
+};
 
-export const useDashboard = () => useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>('/dashboard') });
+export const useDashboard = () => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['dashboard'], queryFn: () => repo.getDashboard() });
+};
 
-export const useHistory = (kind: 'bills' | 'bill-occurrences' | 'events' | 'event-occurrences', id: string | null) =>
-  useQuery({
-    queryKey: ['history', kind, id],
-    queryFn: () => api<HistoryEntry[]>(`/${kind}/${id}/history`),
-    enabled: Boolean(id),
-  });
+export const useHistory = (kind: HistoryKind, id: string | null) => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['history', kind, id], queryFn: () => repo.getHistory(kind, id!), enabled: Boolean(id) });
+};
 
-// ──────────────────────────────────────────── notifications ──
+// ────────────────────────────────────────────── notifications ──
 
-export const useNotifications = () =>
-  useQuery({ queryKey: ['notifications'], queryFn: () => api<AppNotification[]>('/notifications', { query: { limit: 100 } }) });
+export const useNotifications = () => {
+  const repo = useRepository();
+  return useQuery({ queryKey: ['notifications'], queryFn: () => repo.listNotifications({ limit: 100 }) });
+};
 
-export const useUnreadCount = (enabled = true) =>
-  useQuery({
+export const useUnreadCount = (enabled = true) => {
+  const repo = useRepository();
+  return useQuery({
     queryKey: ['unread-count'],
-    queryFn: () => api<{ count: number }>('/notifications/unread-count'),
+    queryFn: async () => ({ count: await repo.getUnreadNotificationCount() }),
     refetchInterval: 60_000,
     enabled,
   });
+};
 
 export function useMarkNotifications() {
+  const repo = useRepository();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id?: string) =>
-      id ? api(`/notifications/${id}/read`, { method: 'POST' }) : api('/notifications/read-all', { method: 'POST' }),
+    mutationFn: (id?: string) => (id ? repo.markNotificationRead(id) : repo.markAllNotificationsRead()),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
       void qc.invalidateQueries({ queryKey: ['unread-count'] });
     },
   });
+}
+
+/** Full export of the user's data, from whichever source is active. */
+export function useExportData() {
+  const repo = useRepository();
+  return useMutation({ mutationFn: () => repo.exportData() });
 }

@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** M1 done (shared core package). Next: M2.
+**Status:** M1 (shared core) and M2 (data layer) done. Next: M3.
 
 ---
 
@@ -61,7 +61,7 @@
 * Move into `packages/core`: recurrence expansion, date/time-zone helpers, occurrence generation and reconciliation rules, status derivation (overdue), reminder math, validation schemas and shared types.
 * Switch the backend to it. **All existing tests must still pass unchanged**, which proves nothing regressed.
 
-### M2 · Data-layer abstraction in the frontend
+### M2 · Data-layer abstraction in the frontend ✅ done
 * Introduce a `Repository` interface covering everything the UI does (list/create/update bills, complete occurrences, calendar feed, dashboard, …).
 * `RemoteRepository` wraps today's REST calls, so the web app behaves exactly as now.
 * The UI talks only to the interface.

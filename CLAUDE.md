@@ -16,6 +16,8 @@ SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monor
 4. **Money** is a decimal string at boundaries and summed in integer cents (`@skr/core` money helpers).
 5. Migrations are forward-only and additive (see `docs/DATABASE.md`). Never edit a shipped migration.
 6. Pin dependency versions exactly.
+7. **Screens never call the server directly.** UI code uses the hooks in `frontend/src/api/hooks.ts`, which go through `DataRepository` (`frontend/src/data/`). New data operations must be added to the interface *and* to every implementation, plus the contract test in `frontend/src/data/remote.test.ts`. Server-only account features belong in `frontend/src/data/account.ts`.
+8. Buttons inside forms must have an explicit `type`. A bare `<button>` submits the form.
 
 ## Commands
 ```bash

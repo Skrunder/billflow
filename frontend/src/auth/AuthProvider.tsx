@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, logoutRequest, NetworkError, refreshSession, setAccessToken, setAuthLostHandler } from '../api/client';
+import { logoutRequest, NetworkError, refreshSession, setAccessToken, setAuthLostHandler } from '../api/client';
+import * as account from '../data/account';
 import type { AuthResponse, User } from '@skr/core';
 import { clearPersistedCache } from '../queryClient';
 
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const data = await api<AuthResponse>('/auth/login', { method: 'POST', body: { email, password }, auth: false });
+      const data = await account.login(email, password);
       applySession(data);
     },
     [applySession],
@@ -130,11 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (input: { email: string; password: string; displayName: string }) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const data = await api<AuthResponse | { verificationRequired: true }>('/auth/register', {
-        method: 'POST',
-        body: { ...input, timezone },
-        auth: false,
-      });
+      const data = await account.register({ ...input, timezone });
       if ('accessToken' in data) {
         applySession(data);
         return { verificationRequired: false };

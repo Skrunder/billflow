@@ -8,7 +8,7 @@ import { BillOccurrenceRow } from '../components/bills/BillOccurrenceRow';
 import { CategoryDot, EmptyState, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useSettings } from '../hooks/useSettings';
-import { describeRecurrence, formatDate, formatMoney, todayIn } from '@skr/core';
+import { describeRecurrence, formatDate, formatMoney, todayIn, type BillOccurrenceQuery } from '@skr/core';
 
 type Tab = 'upcoming' | 'overdue' | 'completed' | 'all';
 
@@ -24,7 +24,7 @@ export function BillsPage() {
 
   const today = todayIn(settings.timezone);
   const horizon = DateTime.fromISO(today).plus({ days: 60 }).toISODate()!;
-  const occQuery =
+  const occQuery: BillOccurrenceQuery =
     tab === 'upcoming'
       ? { start: today, end: horizon, status: 'PENDING', categoryId }
       : tab === 'overdue'
