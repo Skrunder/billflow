@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
-import type { BillStatus, EventStatus } from '../../api/types';
+import type { BillStatus, EventStatus } from '@skr/core';
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (

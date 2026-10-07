@@ -4,6 +4,7 @@
  *   docker compose exec backend node dist/cli.js list-users
  *   docker compose exec backend node dist/cli.js reset-password me@example.com
  */
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import webpush from 'web-push';
 import { prisma } from './lib/prisma';
@@ -18,6 +19,7 @@ Commands:
   disable-user <email>                    Disable an account and sign it out everywhere
   enable-user <email>                     Re-enable an account
   unlock-user <email>                     Clear a failed-login lockout
+  migrate-status                          Show which database migrations are applied
   generate-vapid-keys                     Print a VAPID key pair for Web Push
 `;
 
@@ -82,6 +84,13 @@ async function run(argv: string[]) {
       const user = await findUser(a);
       await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null } });
       console.log(`${user.email} unlocked.`);
+      return;
+    }
+    case 'migrate-status': {
+      // DATABASE_URL was derived from POSTGRES_* by config/env (imported via prisma).
+      const cli = require.resolve('prisma/build/index.js');
+      const r = spawnSync(process.execPath, [cli, 'migrate', 'status'], { stdio: 'inherit', env: process.env });
+      process.exitCode = r.status ?? 1;
       return;
     }
     case 'generate-vapid-keys': {

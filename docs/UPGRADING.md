@@ -46,7 +46,7 @@ Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen
 ```bash
 docker compose ps                                    # all services "healthy"
 curl -s http://localhost:8080/api/health             # {"status":"ok","version":"…"}
-docker compose exec backend node node_modules/prisma/build/index.js migrate status
+docker compose exec backend node dist/cli.js migrate-status
 ```
 
 ## Rolling back

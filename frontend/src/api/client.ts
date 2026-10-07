@@ -1,4 +1,4 @@
-import type { AuthResponse } from './types';
+import type { AuthResponse } from '@skr/core';
 
 /**
  * Fetch wrapper for the REST API.

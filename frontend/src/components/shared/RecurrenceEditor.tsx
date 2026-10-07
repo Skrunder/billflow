@@ -1,6 +1,5 @@
 import clsx from 'clsx';
-import type { Frequency, Recurrence } from '../../api/types';
-import { describeRecurrence, WEEKDAYS_SHORT } from '../../lib/format';
+import { describeRecurrence, type Frequency, type Recurrence, WEEKDAYS_SHORT } from '@skr/core';
 import { Field, Toggle } from '../ui/misc';
 
 export type RecurrenceValue = Omit<Recurrence, 'rrule'> | null;

@@ -8,7 +8,7 @@ import { BillOccurrenceRow } from '../components/bills/BillOccurrenceRow';
 import { CategoryDot, EmptyState, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useSettings } from '../hooks/useSettings';
-import { describeRecurrence, formatDate, formatMoney, todayIn } from '../lib/format';
+import { describeRecurrence, formatDate, formatMoney, todayIn } from '@skr/core';
 
 type Tab = 'upcoming' | 'overdue' | 'completed' | 'all';
 

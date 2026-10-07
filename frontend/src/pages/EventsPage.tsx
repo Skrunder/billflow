@@ -8,7 +8,7 @@ import { EventOccurrenceRow } from '../components/events/EventOccurrenceRow';
 import { CategoryDot, EmptyState, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useSettings } from '../hooks/useSettings';
-import { describeRecurrence, formatClock, formatDate, todayIn } from '../lib/format';
+import { describeRecurrence, formatClock, formatDate, todayIn } from '@skr/core';
 
 type Tab = 'upcoming' | 'completed' | 'all';
 

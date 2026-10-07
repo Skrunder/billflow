@@ -44,7 +44,8 @@ services:
   backend:
     <<: *hardening
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     image: ${BACKEND_IMAGE:-skr-bill-calendar-backend:latest}
     restart: unless-stopped
     init: true
@@ -99,7 +100,8 @@ services:
   frontend:
     <<: *hardening
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
     image: ${FRONTEND_IMAGE:-skr-bill-calendar-frontend:latest}
     restart: unless-stopped
     depends_on:

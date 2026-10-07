@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMe } from '../api/hooks';
-import type { Settings, Theme } from '../api/types';
+import type { Settings, Theme } from '@skr/core';
 
 const FALLBACK: Settings = {
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',

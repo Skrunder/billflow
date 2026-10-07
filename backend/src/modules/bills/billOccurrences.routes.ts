@@ -3,7 +3,7 @@ import type { BillOccurrence, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { badRequest, notFound } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { addDays, fromIsoDate, toIsoDate, todayInZone } from '../../lib/time';
+import { addDays, fromIsoDate, toIsoDate, todayInZone } from '@skr/core';
 import { idParams, isoDate, money, optionalText, parse, timeOfDay } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { audit, diff, getHistory, requestMeta } from '../../services/audit.service';

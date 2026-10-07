@@ -8,10 +8,10 @@ import { logger } from '../../lib/logger';
 import { sendMail, simpleHtml } from '../../lib/mailer';
 import { prisma } from '../../lib/prisma';
 import { randomToken, sha256, signAccessToken } from '../../lib/tokens';
-import { isValidTimezone } from '../../lib/time';
+import { isValidTimezone } from '@skr/core';
 import { CSRF_COOKIE } from '../../middleware/csrf';
 import { audit } from '../../services/audit.service';
-import { DEFAULT_CATEGORIES } from '../../services/defaults';
+import { DEFAULT_CATEGORIES } from '@skr/core';
 
 export const REFRESH_COOKIE = 'skr_rt';
 const REFRESH_COOKIE_PATH = '/api/v1/auth';

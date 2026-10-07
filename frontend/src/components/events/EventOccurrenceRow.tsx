@@ -1,8 +1,7 @@
 import clsx from 'clsx';
 import { Repeat } from 'lucide-react';
-import type { EventOccurrence } from '../../api/types';
+import { type EventOccurrence, formatClock, formatDate } from '@skr/core';
 import { useSettings } from '../../hooks/useSettings';
-import { formatClock, formatDate } from '../../lib/format';
 import { CategoryDot, StatusBadge } from '../ui/misc';
 
 export function EventOccurrenceRow({

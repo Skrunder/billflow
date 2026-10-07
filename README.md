@@ -77,6 +77,7 @@ docker compose exec backend node dist/cli.js reset-password you@example.com 'New
 docker compose exec backend node dist/cli.js set-role friend@example.com ADMIN
 docker compose exec backend node dist/cli.js disable-user someone@example.com
 docker compose exec backend node dist/cli.js unlock-user you@example.com
+docker compose exec backend node dist/cli.js migrate-status                          # applied DB migrations
 docker compose exec backend node dist/cli.js generate-vapid-keys                      # for push notifications
 ```
 
@@ -84,31 +85,44 @@ Without SMTP configured, `reset-password` is how a forgotten password gets reset
 
 ## Development
 
+The repo is an npm-workspaces monorepo:
+
+| Package | Path | What it is |
+|---|---|---|
+| `@skr/core` | `packages/core` | Shared business rules: recurrence, time zones, scheduling, statuses, money, reminders, validation, API types. Used by every app. |
+| backend | `backend` | Express + Prisma REST API |
+| frontend | `frontend` | React PWA |
+
 ```bash
+npm install                      # once, at the repo root (installs every workspace)
+
 # Database for development and tests
 docker run -d --name billcal-dev-db -e POSTGRES_USER=dev -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=billcal -p 5432:5432 postgres:16-alpine
 
 # Backend (http://localhost:4000)
 cd backend
-npm install
 export DATABASE_URL=postgresql://dev:dev@localhost:5432/billcal NODE_ENV=development LOG_PRETTY=true
 npx prisma migrate deploy
-npm run dev
+npm run dev                      # builds @skr/core first
 
 # Frontend (http://localhost:5173, proxies /api to :4000)
-cd frontend
-npm install
-npm run dev
+cd frontend && npm run dev
+
+# Editing packages/core? Rebuild it on change in another terminal:
+npm run dev -w @skr/core
 ```
 
 Tests:
 
 ```bash
-cd backend && TEST_DATABASE_URL=postgresql://dev:dev@localhost:5432/billcal_test npm test   # unit + API integration
-cd frontend && npm test
+npm test -w @skr/core                                                              # shared rules
+TEST_DATABASE_URL=postgresql://dev:dev@localhost:5432/billcal_test npm test -w backend  # API integration
+npm test                                                                           # everything
 ```
 
 The backend integration suite proves the core guarantees. Completing, skipping or reopening one occurrence never changes another, each occurrence keeps its own history, template edits preserve completed occurrences, users cannot see each other's data, and refresh-token rotation and CSRF behave as designed.
+
+Docker images are built from the **repository root** (`docker build -f backend/Dockerfile .`), because both apps include `packages/core`.
 
 ## Tech stack
 

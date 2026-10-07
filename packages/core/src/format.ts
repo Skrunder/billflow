@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import type { Recurrence } from '../api/types';
+import type { Recurrence } from './types.js';
 
 export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

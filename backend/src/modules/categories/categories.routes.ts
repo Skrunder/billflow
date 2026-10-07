@@ -2,23 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { notFound } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { idParams, parse, trimmed } from '../../lib/validate';
+import { categoryCreateInput as createInput, categoryUpdateInput as updateInput, idParams, parse } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { audit } from '../../services/audit.service';
 
 export const categoriesRouter = Router();
-
-const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a hex colour like #4f46e5');
-
-const createInput = z.object({
-  name: trimmed(60).min(1),
-  type: z.enum(['BILL', 'EVENT']),
-  color: color.default('#6366f1'),
-  icon: trimmed(40).nullish(),
-  sortOrder: z.number().int().min(0).max(10000).optional(),
-});
-
-const updateInput = createInput.omit({ type: true }).partial();
 
 categoriesRouter.get('/', async (req, res) => {
   const me = currentUser(req);

@@ -1,5 +1,5 @@
 import { useCategories } from '../../api/hooks';
-import type { CategoryType } from '../../api/types';
+import type { CategoryType } from '@skr/core';
 
 export function CategorySelect({
   id,

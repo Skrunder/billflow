@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { badRequest, unauthorized } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { parse, password, reminderOffsets, timeOfDay, timezoneName, trimmed } from '../../lib/validate';
+import { parse, password, settingsInput, trimmed } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { audit, diff, requestMeta } from '../../services/audit.service';
 import { recomputeInstants } from '../../services/occurrence.service';
 import { getSettings } from '../../services/settings.service';
 import { serializeBill, serializeBillOccurrence, serializeEvent, serializeEventOccurrence } from '../../services/serializers';
-import { todayInZone } from '../../lib/time';
+import { todayInZone } from '@skr/core';
 import { clearAuthCookies, hashPassword, publicUser, revokeAllSessions, verifyPassword } from '../auth/auth.service';
 
 export const usersRouter = Router();
@@ -86,33 +86,6 @@ usersRouter.get('/me/export', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────── settings ──
-
-const VIEWS = ['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listMonth'] as const;
-
-const settingsInput = z
-  .object({
-    timezone: timezoneName,
-    theme: z.enum(['SYSTEM', 'LIGHT', 'DARK']),
-    weekStartsOn: z.number().int().min(0).max(6),
-    currency: z.string().regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
-    locale: z.string().min(2).max(35).refine((l) => {
-      try {
-        return Intl.NumberFormat.supportedLocalesOf([l]).length > 0;
-      } catch {
-        return false;
-      }
-    }, 'Unsupported locale'),
-    timeFormat: z.enum(['12h', '24h']),
-    defaultCalendarView: z.enum(VIEWS),
-    defaultBillReminders: reminderOffsets,
-    defaultEventReminders: reminderOffsets,
-    allDayReminderTime: timeOfDay,
-    autoCompleteAutopay: z.boolean(),
-    inAppNotifications: z.boolean(),
-    emailNotifications: z.boolean(),
-    pushNotifications: z.boolean(),
-  })
-  .partial();
 
 usersRouter.get('/settings', async (req, res) => {
   res.json(serializeSettings(await getSettings(currentUser(req).id)));

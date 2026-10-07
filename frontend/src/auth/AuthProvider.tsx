@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, logoutRequest, NetworkError, refreshSession, setAccessToken, setAuthLostHandler } from '../api/client';
-import type { AuthResponse, User } from '../api/types';
+import type { AuthResponse, User } from '@skr/core';
 import { clearPersistedCache } from '../queryClient';
 
 /**

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../api/client';
 import { useChangePassword, useMe, useServerConfig, useUpdateProfile, useUpdateSettings } from '../api/hooks';
-import type { CalendarView, Settings, Theme } from '../api/types';
+import type { CalendarView, Settings, Theme } from '@skr/core';
 import { useAuth } from '../auth/AuthProvider';
 import { ReminderEditor } from '../components/shared/ReminderEditor';
 import { Modal } from '../components/ui/Modal';

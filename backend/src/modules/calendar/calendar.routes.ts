@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { badRequest } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { addDays, daysBetween, fromIsoDate, toIsoDate, todayInZone } from '../../lib/time';
+import { addDays, daysBetween, fromIsoDate, toIsoDate, todayInZone } from '@skr/core';
 import { dateRangeQuery, parse } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { ensureGenerated } from '../../services/occurrence.service';

@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarCheck, CalendarClock, CheckCircle2, PartyPopper,
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDashboard } from '../api/hooks';
-import type { BillOccurrence, EventOccurrence, PeriodSummary } from '../api/types';
+import { type BillOccurrence, type EventOccurrence, formatDate, formatMoney, type PeriodSummary } from '@skr/core';
 import { BillOccurrenceDialog } from '../components/bills/BillOccurrenceDialog';
 import { BillOccurrenceRow } from '../components/bills/BillOccurrenceRow';
 import { EventOccurrenceDialog } from '../components/events/EventOccurrenceDialog';
@@ -12,7 +12,6 @@ import { EmptyState, ErrorNotice, PageHeader, Segmented } from '../components/ui
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useAuth } from '../auth/AuthProvider';
 import { useSettings } from '../hooks/useSettings';
-import { formatDate, formatMoney } from '../lib/format';
 
 function StatCard({ label, value, sub, icon: Icon, tone }: { label: string; value: string; sub: ReactNode; icon: typeof Wallet; tone: string }) {
   return (

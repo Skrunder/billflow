@@ -6,7 +6,7 @@ import { errorMessage } from '../../api/client';
 import { useBillOccurrence, useBillOccurrenceAction, type BillOccurrenceAction } from '../../api/hooks';
 import { useCanEdit } from '../../hooks/useCanEdit';
 import { useSettings } from '../../hooks/useSettings';
-import { formatClock, formatDate, formatInstant, formatMoney, PAYMENT_METHOD_LABEL } from '../../lib/format';
+import { formatClock, formatDate, formatInstant, formatMoney, PAYMENT_METHOD_LABEL } from '@skr/core';
 import { HistoryList } from '../shared/HistoryList';
 import { CategoryDot, Field, Segmented, StatusBadge } from '../ui/misc';
 import { Modal } from '../ui/Modal';

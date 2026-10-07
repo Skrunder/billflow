@@ -137,5 +137,5 @@ Append-only: `user_id`, `actor_type` (USER / SYSTEM), `entity_type` (BILL, BILL_
   2. Data backfills go in the same migration as SQL `UPDATE`s so they run exactly once.
   3. Never edit a migration that has shipped.
   4. Destructive changes (only in a major release) are called out in the release notes and preceded by an automatic-backup reminder.
-* **Checking state:** `docker compose exec backend node node_modules/prisma/build/index.js migrate status`.
+* **Checking state:** `docker compose exec backend node dist/cli.js migrate-status`.
 * **Rollback:** restore the pre-upgrade backup and run the previous image tag (see [UPGRADING.md](UPGRADING.md)). Migrations are not reversed in place.

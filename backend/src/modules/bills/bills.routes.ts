@@ -3,19 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { badRequest, notFound } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { fromIsoDate, todayInZone } from '../../lib/time';
-import {
-  idParams,
-  isoDate,
-  money,
-  optionalText,
-  parse,
-  recurrenceInput,
-  reminderOffsets,
-  timeOfDay,
-  trimmed,
-  type RecurrenceInput,
-} from '../../lib/validate';
+import { fromIsoDate, todayInZone } from '@skr/core';
+import { billInput, idParams, parse, type BillInputParsed, type RecurrenceInput } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { audit, diff, getHistory, requestMeta } from '../../services/audit.service';
 import { generateForNewBill, regenerateBill } from '../../services/occurrence.service';
@@ -24,30 +13,7 @@ import { getSettings } from '../../services/settings.service';
 
 export const billsRouter = Router();
 
-const billInput = z
-  .object({
-    name: trimmed(120).min(1),
-    description: optionalText(1000),
-    notes: optionalText(5000),
-    amount: money,
-    categoryId: z.string().uuid().nullish(),
-    paymentMethod: z.enum(['MANUAL', 'AUTOPAY', 'SCHEDULED_AUTOPAY']).default('MANUAL'),
-    scheduledPayDaysBefore: z.number().int().min(0).max(60).nullish(),
-    startDate: isoDate,
-    dueTime: timeOfDay.nullish(),
-    recurrence: recurrenceInput,
-    reminderOffsets: reminderOffsets.optional(),
-  })
-  .refine((b) => b.paymentMethod !== 'SCHEDULED_AUTOPAY' || b.scheduledPayDaysBefore != null, {
-    message: 'scheduledPayDaysBefore is required for scheduled auto-pay',
-    path: ['scheduledPayDaysBefore'],
-  })
-  .refine((b) => !b.recurrence?.endDate || b.recurrence.endDate >= b.startDate, {
-    message: 'Recurrence end date must be on or after the start date',
-    path: ['recurrence', 'endDate'],
-  });
-
-type BillInput = z.infer<typeof billInput>;
+type BillInput = BillInputParsed;
 
 function recurrenceColumns(r: RecurrenceInput) {
   return {

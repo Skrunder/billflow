@@ -1,8 +1,22 @@
 import type { Bill, Event, Prisma, UserSettings } from '@prisma/client';
 import { env } from '../config/env';
 import { prisma } from '../lib/prisma';
-import { expandDates, type RecurrenceSpec } from '../lib/recurrence';
-import { addDays, fromIsoDate, localToUtc, toIsoDate, todayInZone } from '../lib/time';
+import {
+  addDays,
+  autopayInstant,
+  billInstants as coreBillInstants,
+  eventInstants,
+  expandDates,
+  fromIsoDate,
+  horizonDate as coreHorizonDate,
+  initialGenerationRange,
+  planReconcile,
+  regenerationRange,
+  toIsoDate,
+  todayInZone,
+  wantedSlots,
+  type RecurrenceSpec,
+} from '@skr/core';
 import type { Db } from './audit.service';
 import { getSettings } from './settings.service';
 
@@ -18,9 +32,6 @@ import { getSettings } from './settings.service';
  *      are never deleted or rewritten by the system.
  *   3. Status changes are always single-row updates by primary key.
  */
-
-/** How far back a brand-new recurring template is back-filled. */
-const BACKFILL_DAYS = 31;
 
 export function billSpec(b: Bill): RecurrenceSpec | null {
   if (!b.recurrenceFrequency) return null;
@@ -46,48 +57,23 @@ export function eventSpec(e: Event): RecurrenceSpec | null {
 
 // ───────────────────────────────────────────── derived instants ──
 
+/** Core billInstants with scheduledPayDate as a DATE-column value. */
 export function billInstants(
   dueDate: string,
   dueTime: string | null,
   bill: Pick<Bill, 'paymentMethod' | 'scheduledPayDaysBefore'>,
   settings: Pick<UserSettings, 'timezone' | 'allDayReminderTime'>,
 ) {
-  const time = dueTime ?? settings.allDayReminderTime;
-  const dueAt = localToUtc(dueDate, time, settings.timezone);
-  if (bill.paymentMethod === 'MANUAL') return { dueAt, scheduledPayDate: null, autopayAt: null };
-  const payDate =
-    bill.paymentMethod === 'SCHEDULED_AUTOPAY' ? addDays(dueDate, -(bill.scheduledPayDaysBefore ?? 0)) : dueDate;
-  return {
-    dueAt,
-    scheduledPayDate: fromIsoDate(payDate),
-    autopayAt: localToUtc(payDate, time, settings.timezone),
-  };
+  const i = coreBillInstants(dueDate, dueTime, bill, settings);
+  return { ...i, scheduledPayDate: i.scheduledPayDate ? fromIsoDate(i.scheduledPayDate) : null };
 }
 
-export function eventInstants(
-  date: string,
-  startTime: string | null,
-  endTime: string | null,
-  settings: Pick<UserSettings, 'timezone' | 'allDayReminderTime'>,
-) {
-  const startAt = localToUtc(date, startTime ?? settings.allDayReminderTime, settings.timezone);
-  let endAt: Date | null = null;
-  if (startTime && endTime) {
-    // An end time earlier than the start time means the event ends the next day.
-    const endDate = endTime <= startTime ? addDays(date, 1) : date;
-    endAt = localToUtc(endDate, endTime, settings.timezone);
-  }
-  return { startAt, endAt };
-}
+export { eventInstants };
 
 // ───────────────────────────────────────────────── generation ──
 
 export function horizonDate(settings: Pick<UserSettings, 'timezone'>): string {
-  return addDays(todayInZone(settings.timezone), env.OCCURRENCE_HORIZON_DAYS);
-}
-
-function maxIso(a: string, b: string) {
-  return a > b ? a : b;
+  return coreHorizonDate(todayInZone(settings.timezone), env.OCCURRENCE_HORIZON_DAYS);
 }
 
 async function insertBillOccurrences(db: Db, bill: Bill, settings: UserSettings, from: string, to: string) {
@@ -128,29 +114,25 @@ async function insertEventOccurrences(db: Db, event: Event, settings: UserSettin
 
 /** Initial materialisation for a newly created bill. */
 export async function generateForNewBill(db: Db, bill: Bill, settings: UserSettings) {
-  const start = toIsoDate(bill.startDate);
-  if (!bill.recurrenceFrequency) {
-    await insertBillOccurrences(db, bill, settings, start, start);
-    await db.bill.update({ where: { id: bill.id }, data: { generatedUntil: bill.startDate } });
-    return;
-  }
-  const until = horizonDate(settings);
-  const from = maxIso(start, addDays(todayInZone(settings.timezone), -BACKFILL_DAYS));
-  await insertBillOccurrences(db, bill, settings, from, until);
-  await db.bill.update({ where: { id: bill.id }, data: { generatedUntil: fromIsoDate(until) } });
+  const { from, to } = initialGenerationRange(
+    toIsoDate(bill.startDate),
+    Boolean(bill.recurrenceFrequency),
+    todayInZone(settings.timezone),
+    env.OCCURRENCE_HORIZON_DAYS,
+  );
+  await insertBillOccurrences(db, bill, settings, from, to);
+  await db.bill.update({ where: { id: bill.id }, data: { generatedUntil: fromIsoDate(to) } });
 }
 
 export async function generateForNewEvent(db: Db, event: Event, settings: UserSettings) {
-  const start = toIsoDate(event.startDate);
-  if (!event.recurrenceFrequency) {
-    await insertEventOccurrences(db, event, settings, start, start);
-    await db.event.update({ where: { id: event.id }, data: { generatedUntil: event.startDate } });
-    return;
-  }
-  const until = horizonDate(settings);
-  const from = maxIso(start, addDays(todayInZone(settings.timezone), -BACKFILL_DAYS));
-  await insertEventOccurrences(db, event, settings, from, until);
-  await db.event.update({ where: { id: event.id }, data: { generatedUntil: fromIsoDate(until) } });
+  const { from, to } = initialGenerationRange(
+    toIsoDate(event.startDate),
+    Boolean(event.recurrenceFrequency),
+    todayInZone(settings.timezone),
+    env.OCCURRENCE_HORIZON_DAYS,
+  );
+  await insertEventOccurrences(db, event, settings, from, to);
+  await db.event.update({ where: { id: event.id }, data: { generatedUntil: fromIsoDate(to) } });
 }
 
 /**
@@ -199,11 +181,8 @@ export async function regenerateBill(db: Db, bill: Bill, settings: UserSettings)
     return;
   }
 
-  const until = horizonDate(settings);
-  const wanted = bill.isArchived ? [] : expandDates(start, billSpec(bill), maxIso(start, today), until);
-  const wantedSet = new Set(wanted);
-  const stale = replaceable.filter((o) => !wantedSet.has(toIsoDate(o.originalDueDate)));
-  const keep = replaceable.filter((o) => wantedSet.has(toIsoDate(o.originalDueDate)));
+  const wanted = wantedSlots(start, billSpec(bill), bill.isArchived, today, env.OCCURRENCE_HORIZON_DAYS);
+  const { keep, stale } = planReconcile(replaceable, (o) => toIsoDate(o.originalDueDate), wanted);
 
   if (stale.length) await db.billOccurrence.deleteMany({ where: { id: { in: stale.map((o) => o.id) } } });
   for (const o of keep) {
@@ -214,8 +193,9 @@ export async function regenerateBill(db: Db, bill: Bill, settings: UserSettings)
     });
   }
   if (!bill.isArchived) {
-    await insertBillOccurrences(db, bill, settings, maxIso(start, today), until);
-    await db.bill.update({ where: { id: bill.id }, data: { generatedUntil: fromIsoDate(until) } });
+    const { from, to } = regenerationRange(start, today, env.OCCURRENCE_HORIZON_DAYS);
+    await insertBillOccurrences(db, bill, settings, from, to);
+    await db.bill.update({ where: { id: bill.id }, data: { generatedUntil: fromIsoDate(to) } });
   }
 }
 
@@ -256,11 +236,8 @@ export async function regenerateEvent(db: Db, event: Event, settings: UserSettin
     return;
   }
 
-  const until = horizonDate(settings);
-  const wanted = event.isArchived ? [] : expandDates(start, eventSpec(event), maxIso(start, today), until);
-  const wantedSet = new Set(wanted);
-  const stale = replaceable.filter((o) => !wantedSet.has(toIsoDate(o.originalDate)));
-  const keep = replaceable.filter((o) => wantedSet.has(toIsoDate(o.originalDate)));
+  const wanted = wantedSlots(start, eventSpec(event), event.isArchived, today, env.OCCURRENCE_HORIZON_DAYS);
+  const { keep, stale } = planReconcile(replaceable, (o) => toIsoDate(o.originalDate), wanted);
 
   if (stale.length) await db.eventOccurrence.deleteMany({ where: { id: { in: stale.map((o) => o.id) } } });
   for (const o of keep) {
@@ -276,8 +253,9 @@ export async function regenerateEvent(db: Db, event: Event, settings: UserSettin
     });
   }
   if (!event.isArchived) {
-    await insertEventOccurrences(db, event, settings, maxIso(start, today), until);
-    await db.event.update({ where: { id: event.id }, data: { generatedUntil: fromIsoDate(until) } });
+    const { from, to } = regenerationRange(start, today, env.OCCURRENCE_HORIZON_DAYS);
+    await insertEventOccurrences(db, event, settings, from, to);
+    await db.event.update({ where: { id: event.id }, data: { generatedUntil: fromIsoDate(to) } });
   }
 }
 
@@ -337,16 +315,17 @@ export async function recomputeInstants(userId: string): Promise<void> {
 
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const o of billOccs) {
-    const time = o.dueTime ?? settings.allDayReminderTime;
     ops.push(
       prisma.billOccurrence.update({
         where: { id: o.id },
         data: {
-          dueAt: localToUtc(toIsoDate(o.dueDate), time, settings.timezone),
-          autopayAt:
-            o.bill.paymentMethod !== 'MANUAL' && o.scheduledPayDate
-              ? localToUtc(toIsoDate(o.scheduledPayDate), time, settings.timezone)
-              : null,
+          dueAt: coreBillInstants(toIsoDate(o.dueDate), o.dueTime, { paymentMethod: 'MANUAL', scheduledPayDaysBefore: null }, settings).dueAt,
+          autopayAt: autopayInstant(
+            o.scheduledPayDate ? toIsoDate(o.scheduledPayDate) : null,
+            o.dueTime,
+            o.bill.paymentMethod,
+            settings,
+          ),
         },
       }),
     );

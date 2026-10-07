@@ -1,10 +1,9 @@
 import clsx from 'clsx';
 import { Check, Repeat, Zap } from 'lucide-react';
 import { useBillOccurrenceAction } from '../../api/hooks';
-import type { BillOccurrence } from '../../api/types';
+import { type BillOccurrence, formatClock, formatDate, formatMoney } from '@skr/core';
 import { useCanEdit } from '../../hooks/useCanEdit';
 import { useSettings } from '../../hooks/useSettings';
-import { formatClock, formatDate, formatMoney } from '../../lib/format';
 import { CategoryDot, StatusBadge } from '../ui/misc';
 import { useToast } from '../ui/Toast';
 

@@ -12,7 +12,7 @@ import { LoadingBlock } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import { useCanEdit } from '../hooks/useCanEdit';
 import { useSettings } from '../hooks/useSettings';
-import { describeOffset, describeRecurrence, formatClock, formatDate, todayIn } from '../lib/format';
+import { describeOffset, describeRecurrence, formatClock, formatDate, todayIn } from '@skr/core';
 
 export function EventDetailPage() {
   const { id } = useParams();

@@ -1,6 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
-import { describeOffset } from '../../lib/format';
+import { describeOffset } from '@skr/core';
 
 export const REMINDER_PRESETS = [
   { minutes: 0, label: 'At time' },

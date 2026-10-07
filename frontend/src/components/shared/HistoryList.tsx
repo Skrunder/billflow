@@ -1,7 +1,7 @@
 import { History } from 'lucide-react';
 import { useHistory } from '../../api/hooks';
 import { useSettings } from '../../hooks/useSettings';
-import { formatInstant } from '../../lib/format';
+import { formatInstant } from '@skr/core';
 import { LoadingBlock } from '../ui/Spinner';
 
 const ACTION_LABEL: Record<string, string> = {

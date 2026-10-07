@@ -1,6 +1,14 @@
 import type { Bill, BillOccurrence, Category, Event, EventOccurrence } from '@prisma/client';
-import { toRRule } from '../lib/recurrence';
-import { toIsoDate } from '../lib/time';
+import {
+  effectiveBillStatus as coreEffectiveBillStatus,
+  toIsoDate,
+  toRRule,
+  type Bill as BillDTO,
+  type BillOccurrence as BillOccurrenceDTO,
+  type BillStatus,
+  type CalendarEvent as EventDTO,
+  type EventOccurrence as EventOccurrenceDTO,
+} from '@skr/core';
 import { billSpec, eventSpec } from './occurrence.service';
 
 /**
@@ -11,9 +19,23 @@ import { billSpec, eventSpec } from './occurrence.service';
 
 type CategoryLite = Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
 
-const money = (v: { toFixed(n: number): string } | null | undefined) => (v == null ? null : v.toFixed(2));
-const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
-const date = (d: Date | null | undefined) => (d ? toIsoDate(d) : null);
+type Decimalish = { toFixed(n: number): string };
+
+function money(v: Decimalish): string;
+function money(v: Decimalish | null | undefined): string | null;
+function money(v: Decimalish | null | undefined) {
+  return v == null ? null : v.toFixed(2);
+}
+function iso(d: Date): string;
+function iso(d: Date | null | undefined): string | null;
+function iso(d: Date | null | undefined) {
+  return d ? d.toISOString() : null;
+}
+function date(d: Date): string;
+function date(d: Date | null | undefined): string | null;
+function date(d: Date | null | undefined) {
+  return d ? toIsoDate(d) : null;
+}
 
 export function serializeCategory(c: CategoryLite) {
   return c ? { id: c.id, name: c.name, color: c.color, icon: c.icon } : null;
@@ -31,14 +53,12 @@ function recurrence(spec: ReturnType<typeof billSpec>) {
   };
 }
 
-export type BillOccurrenceStatusOut = 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'OVERDUE';
-
-/** OVERDUE is derived: still pending and the local due date has passed. */
-export function effectiveBillStatus(o: Pick<BillOccurrence, 'status' | 'dueDate'>, today: string): BillOccurrenceStatusOut {
-  return o.status === 'PENDING' && toIsoDate(o.dueDate) < today ? 'OVERDUE' : o.status;
+/** OVERDUE is derived (see @skr/core status rules). */
+export function effectiveBillStatus(o: Pick<BillOccurrence, 'status' | 'dueDate'>, today: string): BillStatus {
+  return coreEffectiveBillStatus(o.status, toIsoDate(o.dueDate), today);
 }
 
-export function serializeBill(b: Bill & { category?: CategoryLite }) {
+export function serializeBill(b: Bill & { category?: CategoryLite }): BillDTO {
   return {
     id: b.id,
     name: b.name,
@@ -63,7 +83,7 @@ export function serializeBill(b: Bill & { category?: CategoryLite }) {
 export function serializeBillOccurrence(
   o: BillOccurrence & { bill: Bill & { category?: CategoryLite } },
   today: string,
-) {
+): BillOccurrenceDTO {
   return {
     id: o.id,
     billId: o.billId,
@@ -90,7 +110,7 @@ export function serializeBillOccurrence(
   };
 }
 
-export function serializeEvent(e: Event & { category?: CategoryLite }) {
+export function serializeEvent(e: Event & { category?: CategoryLite }): EventDTO {
   return {
     id: e.id,
     title: e.title,
@@ -112,7 +132,7 @@ export function serializeEvent(e: Event & { category?: CategoryLite }) {
   };
 }
 
-export function serializeEventOccurrence(o: EventOccurrence & { event: Event & { category?: CategoryLite } }) {
+export function serializeEventOccurrence(o: EventOccurrence & { event: Event & { category?: CategoryLite } }): EventOccurrenceDTO {
   return {
     id: o.id,
     eventId: o.eventId,

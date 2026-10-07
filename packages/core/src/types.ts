@@ -1,10 +1,20 @@
+/**
+ * API data contracts shared by the server (serializers), the web app and the
+ * Android app. Dates are "YYYY-MM-DD" local days, instants are ISO-8601 UTC
+ * strings and money is a decimal string such as "120.50".
+ */
+
 export type Role = 'ADMIN' | 'USER';
 export type Theme = 'SYSTEM' | 'LIGHT' | 'DARK';
 export type CategoryType = 'BILL' | 'EVENT';
 export type PaymentMethod = 'MANUAL' | 'AUTOPAY' | 'SCHEDULED_AUTOPAY';
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
-export type BillStatus = 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'OVERDUE';
+/** Status values actually stored for a bill occurrence. */
+export type StoredBillStatus = 'PENDING' | 'COMPLETED' | 'SKIPPED';
+/** Status as shown to users — OVERDUE is derived (see status.ts). */
+export type BillStatus = StoredBillStatus | 'OVERDUE';
 export type EventStatus = 'UPCOMING' | 'COMPLETED' | 'CANCELLED';
+export type TimeFormat = '12h' | '24h';
 export type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listMonth';
 
 export interface User {
@@ -22,7 +32,7 @@ export interface Settings {
   weekStartsOn: number;
   currency: string;
   locale: string;
-  timeFormat: '12h' | '24h';
+  timeFormat: TimeFormat;
   defaultCalendarView: CalendarView;
   defaultBillReminders: number[];
   defaultEventReminders: number[];
@@ -110,7 +120,7 @@ export interface BillOccurrence {
   dueAt: string;
   amount: string;
   status: BillStatus;
-  storedStatus: Exclude<BillStatus, 'OVERDUE'>;
+  storedStatus: StoredBillStatus;
   completedAt: string | null;
   amountPaid: string | null;
   confirmationNumber: string | null;

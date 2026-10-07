@@ -6,7 +6,7 @@ import { EmptyState, PageHeader } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useCanEdit } from '../hooks/useCanEdit';
 import { useSettings } from '../hooks/useSettings';
-import { formatInstant } from '../lib/format';
+import { formatInstant } from '@skr/core';
 
 export function NotificationsPage() {
   const settings = useSettings();

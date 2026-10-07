@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, localToUtc, startOfWeek, todayInZone, toIsoDate, fromIsoDate } from '../src/lib/time';
+import { addDays, localToUtc, startOfWeek, todayInZone, toIsoDate, fromIsoDate } from '../src/time.js';
 
 describe('time helpers', () => {
   it('converts local wall-clock time to UTC, honouring DST', () => {

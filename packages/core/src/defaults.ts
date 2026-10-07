@@ -1,4 +1,4 @@
-import type { CategoryType } from '@prisma/client';
+import type { CategoryType } from './types.js';
 
 /** Categories every new account starts with (fully editable by the user). */
 export const DEFAULT_CATEGORIES: { type: CategoryType; name: string; color: string }[] = [

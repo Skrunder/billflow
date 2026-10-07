@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
 # SKR's Bill Calendar — backend API image
+# Build context: the REPOSITORY ROOT (the API depends on packages/core).
+#   docker build -f backend/Dockerfile .
 # Multi-stage: build with dev dependencies, ship only production deps + dist.
 # Runs as the unprivileged "node" user (uid 1000).
 # ─────────────────────────────────────────────────────────────────────────────
@@ -14,21 +16,26 @@ ENV CHECKPOINT_DISABLE=1 \
     PRISMA_HIDE_UPDATE_MESSAGE=1 \
     NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# ── build ────────────────────────────────────────────────────────────────────
-FROM base AS build
+# Workspace manifests only, so dependency layers stay cached between code changes.
+FROM base AS manifests
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY tsconfig.json tsconfig.build.json ./
-COPY prisma ./prisma
-COPY src ./src
-RUN npx prisma generate && npx tsc -p tsconfig.build.json
+COPY packages/core/package.json packages/core/
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+
+# ── build ────────────────────────────────────────────────────────────────────
+FROM manifests AS build
+RUN npm ci -w @skr/core -w backend --no-audit --no-fund
+COPY packages/core packages/core
+COPY backend backend
+# "prebuild" compiles @skr/core first; "build" runs prisma generate + tsc.
+RUN npm run build -w backend
 
 # ── production dependencies ──────────────────────────────────────────────────
-FROM base AS prod-deps
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN npm ci --omit=dev --no-audit --no-fund \
- && npx prisma generate \
+FROM manifests AS prod-deps
+COPY backend/prisma backend/prisma
+RUN npm ci -w backend --omit=dev --no-audit --no-fund \
+ && cd backend && npx prisma generate \
  && npm cache clean --force
 
 # ── runtime ──────────────────────────────────────────────────────────────────
@@ -41,13 +48,16 @@ ENV NODE_ENV=production \
     APP_VERSION=${APP_VERSION}
 
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/dist ./dist
-COPY --chown=node:node prisma ./prisma
-COPY --chown=node:node package.json docker-entrypoint.sh ./
-RUN chmod 0755 docker-entrypoint.sh \
+COPY --from=build --chown=node:node /app/packages/core/package.json ./packages/core/package.json
+COPY --from=build --chown=node:node /app/packages/core/dist ./packages/core/dist
+COPY --from=build --chown=node:node /app/backend/dist ./backend/dist
+COPY --chown=node:node backend/prisma ./backend/prisma
+COPY --chown=node:node backend/package.json backend/docker-entrypoint.sh ./backend/
+RUN chmod 0755 backend/docker-entrypoint.sh \
  && mkdir -p /app/data \
  && chown node:node /app/data
 
+WORKDIR /app/backend
 USER node
 EXPOSE 4000
 VOLUME ["/app/data"]

@@ -14,8 +14,10 @@ fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   log "applying database migrations"
+  # Prisma lives in the (hoisted) workspace node_modules; resolve it like Node does.
+  PRISMA_CLI="$(node -p "require.resolve('prisma/build/index.js')")"
   attempt=1
-  until node node_modules/prisma/build/index.js migrate deploy; do
+  until node "$PRISMA_CLI" migrate deploy; do
     if [ "$attempt" -ge 10 ]; then
       log "migrations failed after $attempt attempts — giving up"
       exit 1

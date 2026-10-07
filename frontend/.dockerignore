@@ -1,9 +1,0 @@
-node_modules
-dist
-dev-dist
-coverage
-*.log
-.env
-.env.*
-Dockerfile
-.dockerignore

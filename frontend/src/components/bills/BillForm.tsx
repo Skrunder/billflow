@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { BillInput } from '../../api/hooks';
-import type { Bill, PaymentMethod } from '../../api/types';
+import { type Bill, PAYMENT_METHOD_LABEL, type PaymentMethod, todayIn } from '@skr/core';
 import { useSettings } from '../../hooks/useSettings';
-import { PAYMENT_METHOD_LABEL, todayIn } from '../../lib/format';
 import { CategorySelect } from '../shared/CategorySelect';
 import { RecurrenceEditor, type RecurrenceValue } from '../shared/RecurrenceEditor';
 import { ReminderEditor } from '../shared/ReminderEditor';

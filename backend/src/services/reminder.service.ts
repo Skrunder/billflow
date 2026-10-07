@@ -1,11 +1,18 @@
-import { DateTime } from 'luxon';
 import type { NotificationChannel, Prisma, UserSettings } from '@prisma/client';
+import {
+  billReminderText,
+  eventReminderText,
+  LATE_GRACE_MS,
+  MAX_REMINDER_MINUTES,
+  reminderTime,
+  selectDueReminders,
+  type ReminderLocale,
+} from '@skr/core';
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
 import { sendMail, simpleHtml } from '../lib/mailer';
 import { prisma } from '../lib/prisma';
 import { sendPushToUser } from '../lib/push';
-import { MAX_REMINDER_MINUTES } from '../lib/validate';
 
 /**
  * Reminder pipeline (runs every minute):
@@ -19,8 +26,6 @@ import { MAX_REMINDER_MINUTES } from '../lib/validate';
  */
 
 const MAX_ATTEMPTS = 3;
-/** "At time of event" reminders are still delivered if we're at most this late. */
-const LATE_GRACE_MS = 60 * 60 * 1000;
 
 function enabledChannels(s: UserSettings): NotificationChannel[] {
   const ch: NotificationChannel[] = [];
@@ -30,37 +35,8 @@ function enabledChannels(s: UserSettings): NotificationChannel[] {
   return ch;
 }
 
-function money(amount: string, s: UserSettings) {
-  try {
-    return new Intl.NumberFormat(s.locale, { style: 'currency', currency: s.currency }).format(Number(amount));
-  } catch {
-    return amount;
-  }
-}
-
-function whenText(at: Date, allDay: boolean, s: UserSettings) {
-  const dt = DateTime.fromJSDate(at).setZone(s.timezone).setLocale(s.locale);
-  const day = dt.toFormat('ccc, LLL d');
-  if (allDay) return day;
-  return `${day} at ${dt.toFormat(s.timeFormat === '24h' ? 'HH:mm' : 'h:mm a')}`;
-}
-
-function relative(offsetMinutes: number) {
-  if (offsetMinutes === 0) return 'now';
-  if (offsetMinutes < 60) return `in ${offsetMinutes} minutes`;
-  if (offsetMinutes < 1440) {
-    const h = Math.round(offsetMinutes / 60);
-    return `in ${h} hour${h === 1 ? '' : 's'}`;
-  }
-  const d = Math.round(offsetMinutes / 1440);
-  return d === 1 ? 'tomorrow' : `in ${d} days`;
-}
-
-/** Real lead time (when delivered late, e.g. after downtime, the text stays truthful). */
-function minutesUntil(at: Date, now: Date, offset: number) {
-  const scheduled = at.getTime() - offset * 60_000;
-  const sendAt = Math.max(scheduled, now.getTime());
-  return Math.max(0, Math.round((at.getTime() - sendAt) / 60_000));
+function reminderLocale(s: UserSettings): ReminderLocale {
+  return { timezone: s.timezone, locale: s.locale, currency: s.currency, timeFormat: s.timeFormat === '24h' ? '24h' : '12h' };
 }
 
 function plan(
@@ -73,11 +49,10 @@ function plan(
   channels: NotificationChannel[],
   render: (offset: number) => { title: string; body: string; url: string },
 ): Prisma.NotificationCreateManyInput[] {
-  const eligible = offsets.filter((o) => at.getTime() - o * 60_000 <= now.getTime());
-  if (!eligible.length || !channels.length) return [];
-  const newest = Math.min(...eligible);
+  const { due, deliver } = selectDueReminders(at, offsets, now);
+  if (!due.length || !channels.length) return [];
   const rows: Prisma.NotificationCreateManyInput[] = [];
-  for (const offset of eligible) {
+  for (const offset of due) {
     const text = render(offset);
     for (const channel of channels) {
       rows.push({
@@ -85,8 +60,8 @@ function plan(
         channel,
         [occurrenceKey]: occurrenceId,
         offsetMinutes: offset,
-        scheduledFor: new Date(at.getTime() - offset * 60_000),
-        status: offset === newest ? 'PENDING' : 'CANCELLED',
+        scheduledFor: reminderTime(at, offset),
+        status: offset === deliver ? 'PENDING' : 'CANCELLED',
         ...text,
       });
     }
@@ -113,10 +88,12 @@ export async function planReminders(now = new Date()): Promise<number> {
     if (!s) continue;
     rows.push(
       ...plan('billOccurrenceId', o.id, o.userId, o.dueAt, o.bill.reminderOffsets, now, enabledChannels(s), (offset) => ({
-        title: `${o.bill.name} is due ${relative(minutesUntil(o.dueAt, now, offset))}`,
-        body: `${money(o.amount.toFixed(2), s)} due ${whenText(o.dueAt, !o.dueTime, s)}${
-          o.bill.paymentMethod !== 'MANUAL' ? ' (auto-pay)' : ''
-        }`,
+        ...billReminderText(
+          { name: o.bill.name, amount: o.amount.toFixed(2), dueAt: o.dueAt, allDay: !o.dueTime, paymentMethod: o.bill.paymentMethod },
+          offset,
+          now,
+          reminderLocale(s),
+        ),
         url: `/bills/${o.billId}?occurrence=${o.id}`,
       })),
     );
@@ -136,8 +113,12 @@ export async function planReminders(now = new Date()): Promise<number> {
     if (!s) continue;
     rows.push(
       ...plan('eventOccurrenceId', o.id, o.userId, o.startAt, o.event.reminderOffsets, now, enabledChannels(s), (offset) => ({
-        title: offset === 0 ? o.event.title : `${o.event.title} ${relative(minutesUntil(o.startAt, now, offset))}`,
-        body: `${whenText(o.startAt, !o.startTime, s)}${o.event.location ? ` · ${o.event.location}` : ''}`,
+        ...eventReminderText(
+          { title: o.event.title, startAt: o.startAt, allDay: !o.startTime, location: o.event.location },
+          offset,
+          now,
+          reminderLocale(s),
+        ),
         url: `/events/${o.eventId}?occurrence=${o.id}`,
       })),
     );

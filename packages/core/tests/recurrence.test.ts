@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandDates, toRRule } from '../src/lib/recurrence';
+import { expandDates, toRRule } from '../src/recurrence.js';
 
 describe('expandDates', () => {
   it('returns the single date for one-time items', () => {

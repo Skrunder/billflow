@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import type { RecurrenceFrequency } from '@prisma/client';
+import type { Frequency } from './types.js';
 
 /**
  * Pure recurrence expansion on calendar dates (no timezones involved — the
@@ -10,7 +10,7 @@ import type { RecurrenceFrequency } from '@prisma/client';
  */
 
 export interface RecurrenceSpec {
-  frequency: RecurrenceFrequency;
+  frequency: Frequency;
   /** Every N units — "custom interval" is any interval > 1 (e.g. every 2 weeks). */
   interval: number;
   /** WEEKLY only. 0 = Sunday … 6 = Saturday. Empty = weekday of the start date. */
@@ -88,7 +88,7 @@ export function expandDates(
   return out;
 }
 
-const RRULE_FREQ: Record<RecurrenceFrequency, string> = {
+const RRULE_FREQ: Record<Frequency, string> = {
   DAILY: 'DAILY',
   WEEKLY: 'WEEKLY',
   MONTHLY: 'MONTHLY',

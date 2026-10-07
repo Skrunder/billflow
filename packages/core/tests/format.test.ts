@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeOffset, describeRecurrence, formatClock, formatMoney, relativeDay } from './format';
+import { describeOffset, describeRecurrence, formatClock, formatMoney, relativeDay } from '../src/format.js';
 
 describe('format helpers', () => {
   it('formats money with the currency', () => {

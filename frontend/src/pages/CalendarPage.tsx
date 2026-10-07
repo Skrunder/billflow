@@ -10,7 +10,7 @@ import { DateTime } from 'luxon';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCalendar } from '../api/hooks';
-import type { CalendarItem } from '../api/types';
+import { type CalendarItem, formatDate, formatMoney } from '@skr/core';
 import { BillOccurrenceDialog } from '../components/bills/BillOccurrenceDialog';
 import { EventOccurrenceDialog } from '../components/events/EventOccurrenceDialog';
 import { Modal } from '../components/ui/Modal';
@@ -18,7 +18,6 @@ import { PageHeader, Segmented } from '../components/ui/misc';
 import { Spinner } from '../components/ui/Spinner';
 import { useCanEdit } from '../hooks/useCanEdit';
 import { useMediaQuery, useSettings } from '../hooks/useSettings';
-import { formatDate, formatMoney } from '../lib/format';
 
 type Filter = 'all' | 'bills' | 'events';
 

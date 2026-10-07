@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** planned, not started.
+**Status:** M1 done (shared core package). Next: M2.
 
 ---
 
@@ -56,7 +56,7 @@
 
 ## 3. Milestones
 
-### M1 · Shared core package
+### M1 · Shared core package ✅ done
 * Convert the repo to npm workspaces: `packages/core`, `backend`, `frontend`.
 * Move into `packages/core`: recurrence expansion, date/time-zone helpers, occurrence generation and reconciliation rules, status derivation (overdue), reminder math, validation schemas and shared types.
 * Switch the backend to it. **All existing tests must still pass unchanged**, which proves nothing regressed.

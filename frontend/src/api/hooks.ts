@@ -15,7 +15,7 @@ import type {
   ServerConfig,
   Settings,
   User,
-} from './types';
+} from '@skr/core';
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 

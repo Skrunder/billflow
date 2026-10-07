@@ -2,7 +2,7 @@ import { Check, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../api/client';
 import { useCategories, useDeleteCategory, useSaveCategory } from '../api/hooks';
-import type { Category, CategoryType } from '../api/types';
+import type { Category, CategoryType } from '@skr/core';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CategoryDot, EmptyState, PageHeader } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';

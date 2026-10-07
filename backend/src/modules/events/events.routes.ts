@@ -3,18 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { badRequest, notFound } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { fromIsoDate, todayInZone } from '../../lib/time';
-import {
-  idParams,
-  isoDate,
-  optionalText,
-  parse,
-  recurrenceInput,
-  reminderOffsets,
-  timeOfDay,
-  trimmed,
-  type RecurrenceInput,
-} from '../../lib/validate';
+import { fromIsoDate, todayInZone } from '@skr/core';
+import { eventInput, idParams, parse, type EventInputParsed, type RecurrenceInput } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { audit, diff, getHistory, requestMeta } from '../../services/audit.service';
 import { generateForNewEvent, regenerateEvent } from '../../services/occurrence.service';
@@ -27,26 +17,7 @@ import { getSettings } from '../../services/settings.service';
  */
 export const eventsRouter = Router();
 
-const eventInput = z
-  .object({
-    title: trimmed(120).min(1),
-    description: optionalText(1000),
-    notes: optionalText(5000),
-    location: optionalText(200),
-    categoryId: z.string().uuid().nullish(),
-    startDate: isoDate,
-    startTime: timeOfDay.nullish(),
-    endTime: timeOfDay.nullish(),
-    recurrence: recurrenceInput,
-    reminderOffsets: reminderOffsets.optional(),
-  })
-  .refine((e) => !e.endTime || e.startTime, { message: 'An end time needs a start time', path: ['endTime'] })
-  .refine((e) => !e.recurrence?.endDate || e.recurrence.endDate >= e.startDate, {
-    message: 'Recurrence end date must be on or after the start date',
-    path: ['recurrence', 'endDate'],
-  });
-
-type EventInput = z.infer<typeof eventInput>;
+type EventInput = EventInputParsed;
 
 function recurrenceColumns(r: RecurrenceInput) {
   return {

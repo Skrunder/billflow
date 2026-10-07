@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { Prisma } from '@prisma/client';
+import type { BillOccurrenceStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { addDays, endOfMonth, fromIsoDate, startOfMonth, startOfWeek, todayInZone } from '../../lib/time';
+import { addDays, endOfMonth, fromIsoDate, startOfMonth, startOfWeek, summarizeBills, todayInZone, toIsoDate } from '@skr/core';
 import { currentUser } from '../../middleware/auth';
 import { categorySelect, serializeBillOccurrence, serializeEventOccurrence } from '../../services/serializers';
 import { getSettings } from '../../services/settings.service';
@@ -12,41 +12,19 @@ const billInclude = { bill: { include: { category: categorySelect } } } as const
 const eventInclude = { event: { include: { category: categorySelect } } } as const;
 
 /**
- * Summary of a date window. Only bill occurrences contribute to money totals —
- * events are informational and never counted.
+ * Totals for a date window (rules in @skr/core). Only bill occurrences
+ * contribute to money totals — events are informational and never counted.
  */
-function summarise(rows: { status: string; amount: Prisma.Decimal; amountPaid: Prisma.Decimal | null; dueDate: Date }[], today: string) {
-  let total = new Prisma.Decimal(0);
-  let paid = new Prisma.Decimal(0);
-  let remaining = new Prisma.Decimal(0);
-  let overdue = new Prisma.Decimal(0);
-  const counts = { total: rows.length, pending: 0, completed: 0, skipped: 0, overdue: 0 };
-  for (const r of rows) {
-    if (r.status === 'SKIPPED') {
-      counts.skipped++;
-      continue;
-    }
-    total = total.add(r.amount);
-    if (r.status === 'COMPLETED') {
-      counts.completed++;
-      paid = paid.add(r.amountPaid ?? r.amount);
-    } else {
-      remaining = remaining.add(r.amount);
-      if (r.dueDate.toISOString().slice(0, 10) < today) {
-        counts.overdue++;
-        overdue = overdue.add(r.amount);
-      } else {
-        counts.pending++;
-      }
-    }
-  }
-  return {
-    counts,
-    total: total.toFixed(2),
-    paid: paid.toFixed(2),
-    remaining: remaining.toFixed(2),
-    overdue: overdue.toFixed(2),
-  };
+function summarise(rows: { status: BillOccurrenceStatus; amount: Prisma.Decimal; amountPaid: Prisma.Decimal | null; dueDate: Date }[], today: string) {
+  return summarizeBills(
+    rows.map((r) => ({
+      status: r.status,
+      amount: r.amount.toFixed(2),
+      amountPaid: r.amountPaid ? r.amountPaid.toFixed(2) : null,
+      dueDate: toIsoDate(r.dueDate),
+    })),
+    today,
+  );
 }
 
 dashboardRouter.get('/', async (req, res) => {

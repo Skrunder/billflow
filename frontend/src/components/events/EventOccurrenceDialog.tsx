@@ -5,7 +5,7 @@ import { errorMessage } from '../../api/client';
 import { useEventOccurrence, useEventOccurrenceAction, type EventOccurrenceAction } from '../../api/hooks';
 import { useCanEdit } from '../../hooks/useCanEdit';
 import { useSettings } from '../../hooks/useSettings';
-import { formatClock, formatDate, formatInstant } from '../../lib/format';
+import { formatClock, formatDate, formatInstant } from '@skr/core';
 import { HistoryList } from '../shared/HistoryList';
 import { CategoryDot, Field, Segmented, StatusBadge } from '../ui/misc';
 import { Modal } from '../ui/Modal';

@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { EventInput } from '../../api/hooks';
-import type { CalendarEvent } from '../../api/types';
+import { type CalendarEvent, todayIn } from '@skr/core';
 import { useSettings } from '../../hooks/useSettings';
-import { todayIn } from '../../lib/format';
 import { CategorySelect } from '../shared/CategorySelect';
 import { RecurrenceEditor, type RecurrenceValue } from '../shared/RecurrenceEditor';
 import { ReminderEditor } from '../shared/ReminderEditor';

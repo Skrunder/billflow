@@ -38,7 +38,8 @@ flowchart LR
 | HTTP | `backend/src/app.ts` | helmet, pino-http request logs with request IDs, JSON body limit, `trust proxy`, rate limiting, `/api/v1` versioned routes |
 | Modules | `backend/src/modules/*` | auth, users/settings, categories, bills, bill-occurrences, events, event-occurrences, calendar, dashboard, notifications/push, audit, health |
 | Domain services | `backend/src/services/*` | occurrence generation/reconciliation, reminders, auto-pay, audit, scheduler |
-| Pure libraries | `backend/src/lib/*` | recurrence expansion, timezone math, tokens, validation, mail, push |
+| Shared rules | `packages/core` (`@skr/core`) | recurrence expansion, timezone math, scheduling/reconcile decisions, overdue status, money totals, reminder selection and text, validation schemas, API types. The same code runs in the server, the web app and (next) the Android app. |
+| Server libraries | `backend/src/lib/*` | tokens, mail, push, prisma, logger, errors, schema re-exports |
 | Persistence | Prisma 6 → PostgreSQL | migrations in `backend/prisma/migrations`, applied on container start |
 
 **Background scheduler** (in-process, `services/scheduler.ts`):
@@ -137,8 +138,14 @@ main.tsx
 ├── docker-compose.yml          # db · backend · frontend · backup (profile)
 ├── .env.example
 ├── scripts/                    # backup.sh · restore.sh
+├── package.json                # npm workspaces root
 ├── docs/                       # this documentation
 ├── .github/workflows/          # CI + image publishing
+├── packages/
+│   └── core/                   # @skr/core: shared business rules (server, web, Android)
+│       ├── src/                # recurrence · time · schedule · status · money · reminders
+│       │                       # schemas (zod) · types (API contracts) · format · defaults
+│       └── tests/
 ├── backend/
 │   ├── Dockerfile · docker-entrypoint.sh
 │   ├── prisma/
@@ -149,10 +156,11 @@ main.tsx
 │   │   ├── app.ts              # express app factory
 │   │   ├── cli.ts              # admin CLI
 │   │   ├── config/env.ts       # startup validation
-│   │   ├── lib/                # recurrence, time, tokens, validate, mailer, push, prisma, logger, errors
+│   │   ├── lib/                # tokens, validate (re-exports core schemas), mailer, push, prisma, logger, errors
 │   │   ├── middleware/         # auth, csrf, rateLimit, errorHandler
 │   │   ├── modules/<feature>/  # *.routes.ts (+ service where non-trivial)
 │   │   ├── services/           # occurrence, reminder, autopay, scheduler, audit, settings, serializers
+│   │   │                       # (DB operations; the rules they apply come from @skr/core)
 │   │   └── scripts/database-url.ts
 │   └── tests/                  # unit + API integration tests (vitest + supertest)
 └── frontend/
@@ -160,10 +168,10 @@ main.tsx
     ├── public/                 # icons, favicon, theme-init.js
     └── src/
         ├── main.tsx · App.tsx · sw.ts · queryClient.ts · index.css
-        ├── api/                # client, hooks, types
+        ├── api/                # client, hooks (types come from @skr/core)
         ├── auth/AuthProvider.tsx
         ├── hooks/              # settings/theme/online, canEdit
-        ├── lib/                # format, push
+        ├── lib/                # push
         ├── components/{ui,layout,shared,bills,events}/
         └── pages/              # one file per route (+ auth/)
 ```
