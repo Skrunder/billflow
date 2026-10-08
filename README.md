@@ -10,6 +10,15 @@ docker compose up -d
 
 ---
 
+## Download
+
+| | |
+|---|---|
+| **Android app** | [**Download the latest APK**](https://github.com/Skrunder/billflow/releases/latest/download/billflow.apk) · [all releases](https://github.com/Skrunder/billflow/releases) |
+| **Server and web app** | Self-host with Docker Compose: see [Quick start](#quick-start) |
+
+Each release has the APK twice: `billflow.apk` (the link above always gets the newest) and `billflow-<version>.apk`. While this repository is private, you need to be signed in to GitHub to download. Installing and updating: [Android app](#android-app).
+
 ## Features
 
 | | |
@@ -59,7 +68,7 @@ The repository is private, so `git clone` needs your GitHub login (`gh auth logi
 
 ### Android app
 
-The Android app works on its own, with no server needed. It keeps your data on the phone and sends reminders as Android notifications. Build it with `scripts/build-apk.sh` (see [docs/ANDROID.md](docs/ANDROID.md)), copy `dist-apk/billflow-<version>.apk` to the phone and open it to install. To update, install the newer APK over the old one; your data is kept.
+The Android app works on its own, with no server needed. It keeps your data on the phone and sends reminders as Android notifications. [Download the latest APK](https://github.com/Skrunder/billflow/releases/latest/download/billflow.apk) on the phone and open it to install; Android asks once to allow installs from your browser or file manager. You can also build it yourself with `scripts/build-apk.sh` (see [docs/ANDROID.md](docs/ANDROID.md)). To update, install the newer APK over the old one; your data is kept.
 
 To share data with your server and the web app, open *Settings → Server sync → Connect to server*, enter your server's address and sign in. If both sides already have data, choose **Combine both** or **Use the server's data**. Changes then sync both ways, and the app keeps working offline. Without a server, use *Settings → Backup* to save a backup file somewhere safe, such as Google Drive.
 
@@ -76,6 +85,114 @@ Dumps are written to `./backups` and kept for 14 days. See [docs/BACKUP_RESTORE.
 ### Put it behind HTTPS
 
 Point your reverse proxy (Nginx Proxy Manager, Traefik, Cloudflare Tunnel, Caddy, plain nginx) at `http://<host>:8080`, then set `APP_URL=https://bills.example.com` in `.env` and run `docker compose up -d`. Examples are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#reverse-proxies).
+
+## Configuration
+
+### The `.env` file
+
+All settings live in `.env`, next to `docker-compose.yml`. Start from `.env.example`. **Only `POSTGRES_PASSWORD` is required**; everything else has a working default. After editing `.env`, run `docker compose up -d` to apply it. Every variable is described in full in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
+
+**Required**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `POSTGRES_PASSWORD` | *(none)* | Database password. Generate one with `openssl rand -hex 24`. It is fixed when the database is first created, so changing it later needs `ALTER USER` inside PostgreSQL. |
+
+**Address and network**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `APP_URL` | `http://localhost:8080` | The address people open the app at. Used in emails; an `https://` address also turns on secure cookies. |
+| `APP_PORT` | `8080` | Port on the host where the web app is published. |
+| `APP_BIND_ADDRESS` | `0.0.0.0` | Network interface to publish on. `127.0.0.1` makes it reachable only through a reverse proxy on the same machine. |
+| `TRUST_PROXY` | `loopback, linklocal, uniquelocal` | Which proxies may pass on the visitor's real IP (`X-Forwarded-*`). The default trusts private networks. |
+| `COOKIE_SECURE` | `auto` | `auto` uses secure cookies when `APP_URL` is https. Force with `true` or `false`. |
+
+**Database and storage**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_DB` | `billcalendar` | Database user and name. Set them before the first start only. |
+| `DB_DATA_PATH` | Docker volume `db_data` | Store the database in a host folder instead, e.g. `/mnt/user/appdata/billflow/postgres` on Unraid. |
+| `APP_DATA_PATH` | Docker volume `backend_data` | Host folder for the app's own data (the generated sign-in secret). Must be writable by user id 1000. |
+
+**Accounts and security**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ALLOW_REGISTRATION` | `true` | Let new people sign up. Set to `false` once your accounts exist; the first account can always be created. |
+| `REQUIRE_EMAIL_VERIFICATION` | `false` | Require a confirmed email before sign-in (needs SMTP). |
+| `JWT_SECRET` | generated | Secret that signs sign-ins. Leave empty to generate one on first start; changing it signs everyone out. |
+| `ACCESS_TOKEN_TTL_MINUTES` | `15` | How long a sign-in token lasts before it is silently renewed. |
+| `REFRESH_TOKEN_TTL_DAYS` | `30` | How long "stay signed in" lasts. |
+| `BCRYPT_ROUNDS` | `12` | Password hashing strength (10–15). |
+| `RATE_LIMIT_WINDOW_MINUTES` / `RATE_LIMIT_MAX` | `15` / `1000` | API requests allowed per IP in each window. |
+| `AUTH_RATE_LIMIT_MAX` | `20` | Sign-in, sign-up and password-reset attempts per IP in each window. |
+
+**Behaviour**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DEFAULT_TIMEZONE` | `UTC` | Time zone for new accounts when the browser's can't be detected. |
+| `OCCURRENCE_HORIZON_DAYS` | `400` | How far ahead recurring bills and events are created. |
+| `LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug`. |
+| `RUN_MIGRATIONS` | `true` | Update the database structure automatically when a new version starts. |
+
+**Email (optional):** password resets, verification and email reminders
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SMTP_HOST` | *(empty = email off)* | Mail server, e.g. `smtp.gmail.com`. |
+| `SMTP_PORT` | `587` | |
+| `SMTP_SECURE` | `false` | `true` for port 465; `false` for STARTTLS on 587. |
+| `SMTP_USER` / `SMTP_PASSWORD` | | Login. Use an app password for Gmail and similar. |
+| `SMTP_FROM` | `BillFlow <no-reply@localhost>` | Sender name and address. |
+
+**Push notifications (optional):** reminders on phones and desktops
+
+| Variable | Default | What it does |
+|---|---|---|
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(empty = push off)* | Generate a pair with `docker compose run --rm backend node dist/cli.js generate-vapid-keys`. Push also needs HTTPS. |
+| `VAPID_SUBJECT` | `mailto:admin@localhost` | Contact address given to the push services. |
+
+**Backups (optional `backup` profile)**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `BACKUP_PATH` | `./backups` | Host folder for the database dumps. |
+| `BACKUP_INTERVAL_HOURS` | `24` | How often to back up. |
+| `BACKUP_KEEP_DAYS` | `14` | Older dumps are deleted. |
+
+**Images (optional)**
+
+| Variable | Default | What it does |
+|---|---|---|
+| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | `skr-bill-calendar-backend:latest` / `skr-bill-calendar-frontend:latest` | Image names. By default Compose builds them from this repo; point these at a registry to use prebuilt images. |
+
+### Docker Compose services
+
+`docker-compose.yml` runs these containers on a private network. Only the web container publishes a port.
+
+| Service | Image | What it does | Data |
+|---|---|---|---|
+| `db` | `postgres:16-alpine` | PostgreSQL database. | `db_data` volume (or `DB_DATA_PATH`) |
+| `backend` | built from `backend/Dockerfile` | The API, reminders and auto-pay jobs. Runs database migrations on start. | `backend_data` volume (or `APP_DATA_PATH`) |
+| `frontend` | built from `frontend/Dockerfile` | nginx serving the web app and passing `/api` to the backend. | none |
+| `backup` | `postgres:16-alpine` | **Optional** (`--profile backup`). Writes a `pg_dump` every `BACKUP_INTERVAL_HOURS` to `BACKUP_PATH`. | host folder |
+
+Each service waits for the one before it to be healthy, restarts automatically (`unless-stopped`), and runs hardened: no privilege escalation, Linux capabilities dropped, logs capped at 5 × 10 MB, and the backend with a read-only filesystem. The Compose project is named `skr-bill-calendar` (kept from the app's old name so existing volumes stay attached).
+
+Common commands:
+
+```bash
+docker compose up -d                       # start, or apply .env changes
+docker compose --profile backup up -d      # start with automatic backups
+docker compose ps                          # status and health
+docker compose logs -f backend             # follow the API logs
+docker compose pull && docker compose up -d     # update when using registry images
+git pull && docker compose up -d --build        # update when building from source
+docker compose down                        # stop (data volumes are kept)
+```
 
 ## Documentation
 

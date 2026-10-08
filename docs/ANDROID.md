@@ -42,11 +42,23 @@ a build signed with a new key.
 
 ## Installing on a phone
 
-1. Copy `dist-apk/billflow-<version>.apk` to the phone (USB, Drive, email to yourself, or a link on your LAN).
+1. Download the APK from the [latest GitHub release](https://github.com/Skrunder/billflow/releases/latest) on the phone,
+   or copy `dist-apk/billflow-<version>.apk` to it (USB, Drive, email to yourself, or a link on your LAN).
 2. Open it. Android asks once to allow installs from that app (Files, Chrome…).
 3. To update, install the newer APK over it. Data is kept.
 
 Debug and release builds are signed with different keys, so switching between them needs an uninstall.
+
+### Publishing a release
+
+After tagging a version, attach the signed APK to a GitHub release, under its versioned name and as
+`billflow.apk` (the README's "latest" download link points at that name):
+
+```bash
+cp dist-apk/billflow-<version>.apk /tmp/billflow.apk
+gh release create v<version> dist-apk/billflow-<version>.apk /tmp/billflow.apk \
+  --title "BillFlow <version>" --notes "<changelog entry>"
+```
 
 ## Phone features
 
