@@ -12,7 +12,7 @@ import { describeSync } from './SyncIndicator';
 
 /**
  * Settings → Server sync (standalone app). Connect the phone to a
- * self-hosted Bill Calendar server, see how syncing is going, sync now,
+ * self-hosted BillFlow server, see how syncing is going, sync now,
  * sign in again, or disconnect. Rendered only when a sync client exists.
  */
 export function ServerSyncSection() {
@@ -56,7 +56,7 @@ export function ServerSyncSection() {
       <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
         {connected
           ? 'This phone and your server share the same bills and events. Everything keeps working offline; changes sync when the server can be reached.'
-          : 'Optional: connect to your self-hosted Bill Calendar server to share data with the web app and other phones. Everything keeps working offline either way.'}
+          : 'Optional: connect to your self-hosted BillFlow server to share data with the web app and other phones. Everything keeps working offline either way.'}
       </p>
 
       {!connected && (
@@ -192,7 +192,7 @@ function ConnectDialog({ client, onClose }: { client: SyncClient; onClose: () =>
       {step.kind === 'form' && (
         <form onSubmit={signIn} className="space-y-4" noValidate>
           <ErrorNotice error={error} />
-          <Field label="Server address" hint={addressNote ?? 'The address you open Bill Calendar at, e.g. 192.168.1.20:8080 or https://bills.example.com'}>
+          <Field label="Server address" hint={addressNote ?? 'The address you open BillFlow at, e.g. 192.168.1.20:8080 or https://bills.example.com'}>
             {(id) => (
               <input id={id} className="input" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="192.168.1.20:8080" required />
             )}

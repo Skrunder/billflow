@@ -17,7 +17,7 @@ async function main() {
       webPush: env.pushEnabled,
       trustProxy: env.TRUST_PROXY,
     },
-    "starting SKR's Bill Calendar API",
+    "starting BillFlow API",
   );
   if (env.REQUIRE_EMAIL_VERIFICATION && !env.smtpEnabled) {
     logger.warn('REQUIRE_EMAIL_VERIFICATION is on but SMTP is not configured — verification is disabled');

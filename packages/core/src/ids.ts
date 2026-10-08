@@ -10,7 +10,7 @@
  * identical in Node, browsers and Android WebViews.
  */
 
-/** Fixed namespace for SKR's Bill Calendar occurrence ids. Never change it. */
+/** Fixed namespace for occurrence ids (chosen when BillFlow was called SKR's Bill Calendar). Never change it. */
 export const OCCURRENCE_NAMESPACE = 'b1c5a7e2-3f4d-5a6b-8c9d-0e1f2a3b4c5d';
 
 function utf8Bytes(s: string): number[] {

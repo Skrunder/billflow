@@ -4,7 +4,7 @@
 #   scripts/build-apk.sh            signed release APK  (needs scripts/android/new-keystore.sh once)
 #   scripts/build-apk.sh debug      debug APK (debuggable; used by the emulator tests)
 #
-# Output: dist-apk/bill-calendar-<version>[-debug].apk. The version comes from frontend/package.json.
+# Output: dist-apk/billflow-<version>[-debug].apk. The version comes from frontend/package.json.
 set -euo pipefail
 
 MODE=${1:-release}
@@ -23,14 +23,14 @@ case "$MODE" in
     SIGNING=(-v "$KEYDIR":/keystore:ro,z)
     PROPS=(-PskrKeystoreProperties=/keystore/keystore.properties)
     OUT=frontend/android/app/build/outputs/apk/release/app-release.apk
-    DEST=dist-apk/bill-calendar-$VERSION.apk
+    DEST=dist-apk/billflow-$VERSION.apk
     ;;
   debug)
     TASK=assembleDebug
     SIGNING=()
     PROPS=()
     OUT=frontend/android/app/build/outputs/apk/debug/app-debug.apk
-    DEST=dist-apk/bill-calendar-$VERSION-debug.apk
+    DEST=dist-apk/billflow-$VERSION-debug.apk
     ;;
   *)
     echo "usage: $0 [release|debug]" >&2

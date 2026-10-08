@@ -3,7 +3,7 @@
 Guidance for AI assistants working in this repository.
 
 ## What this is
-SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monorepo:
+BillFlow (formerly SKR's Bill Calendar): a self-hosted bill and event calendar. npm-workspaces monorepo:
 - `packages/core` (`@skr/core`): shared business rules and API types. **Put anything that must behave identically on server, web and Android here.**
 - `backend`: Express 5 + Prisma 6 + PostgreSQL 16 API (`/api/v1`)
 - `frontend`: React 18 PWA (Vite, Tailwind 4, FullCalendar, TanStack Query). Tailwind is configured in `src/index.css` (`@theme`; shared classes like `btn-*`, `input`, `card` in `@layer components`); there is no `tailwind.config`

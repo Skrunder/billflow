@@ -71,7 +71,7 @@ usersRouter.get('/me/export', async (req, res) => {
     prisma.event.findMany({ where: { userId: me.id }, include: { category: true } }),
     prisma.eventOccurrence.findMany({ where: { userId: me.id }, include: { event: { include: { category: true } } }, orderBy: { eventDate: 'asc' } }),
   ]);
-  res.setHeader('Content-Disposition', `attachment; filename="bill-calendar-export-${today}.json"`);
+  res.setHeader('Content-Disposition', `attachment; filename="billflow-export-${today}.json"`);
   res.json({
     exportedAt: new Date().toISOString(),
     format: 'skr-bill-calendar-export@1',

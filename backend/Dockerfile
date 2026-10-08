@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
-# SKR's Bill Calendar — backend API image
+# BillFlow — backend API image
 # Build context: the REPOSITORY ROOT (the API depends on packages/core).
 #   docker build -f backend/Dockerfile .
 # Multi-stage: build with dev dependencies, ship only production deps + dist.
@@ -69,7 +69,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
 ENTRYPOINT ["/sbin/tini", "--", "./docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
 
-LABEL org.opencontainers.image.title="SKR's Bill Calendar API" \
+LABEL org.opencontainers.image.title="BillFlow API" \
       org.opencontainers.image.description="Self-hosted bill & event calendar — backend API" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${APP_VERSION}"

@@ -1,4 +1,4 @@
-// SKR's Bill Calendar — database schema
+// BillFlow — database schema
 //
 // Core design rule: recurring *templates* (Bill, Event) are stored separately
 // from their *occurrences* (BillOccurrence, EventOccurrence). Every occurrence

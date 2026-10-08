@@ -91,11 +91,7 @@ export function AppLayout() {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
         <Link to="/" className="flex items-center gap-2.5 px-5 py-5">
           <img src="/favicon.svg" alt="" className="h-8 w-8" />
-          <span className="text-sm font-semibold leading-tight">
-            SKR&apos;s
-            <br />
-            Bill Calendar
-          </span>
+          <span className="text-base font-semibold tracking-tight">BillFlow</span>
         </Link>
         <nav className="flex-1 space-y-1 px-3" aria-label="Main">
           {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -138,7 +134,7 @@ export function AppLayout() {
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 pb-3 pt-[max(0.75rem,var(--inset-top))] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/85 md:px-6">
           <Link to="/" className="flex items-center gap-2 md:hidden">
             <img src="/favicon.svg" alt="" className="h-7 w-7" />
-            <span className="text-sm font-semibold">Bill Calendar</span>
+            <span className="text-sm font-semibold">BillFlow</span>
           </Link>
           <div className="hidden md:block" />
           <div className="flex items-center gap-1.5">

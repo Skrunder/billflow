@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # ─────────────────────────────────────────────────────────────────────────────
-# SKR's Bill Calendar — restore a database dump
+# BillFlow — restore a database dump
 #
 # Usage:  ./scripts/restore.sh backups/billcalendar-20261007T120000Z.dump [appdata.tar.gz]
 #

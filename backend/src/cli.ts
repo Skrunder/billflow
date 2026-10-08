@@ -10,7 +10,7 @@ import webpush from 'web-push';
 import { prisma } from './lib/prisma';
 import { hashPassword, revokeAllSessions } from './modules/auth/auth.service';
 
-const usage = `SKR's Bill Calendar admin CLI
+const usage = `BillFlow admin CLI
 
 Commands:
   list-users                              List all accounts

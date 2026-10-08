@@ -25,7 +25,7 @@ docker build -q -t "$IMAGE" "$ROOT/scripts/android" >/dev/null
 PASSWORD=$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)
 docker run --rm --user "$(id -u):$(id -g)" -e KS_PASS="$PASSWORD" -v "$KEYDIR":/keystore:z "$IMAGE" \
   keytool -genkeypair -keystore /keystore/release.jks -storetype PKCS12 -alias skr-bill-calendar \
-  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=SKR Bill Calendar" \
+  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=BillFlow" \
   -storepass:env KS_PASS -keypass:env KS_PASS >/dev/null 2>&1
 
 umask 077

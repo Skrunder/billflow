@@ -167,7 +167,7 @@ export async function dispatchReminders(now = new Date()): Promise<number> {
             to: n.user.email,
             subject: n.title,
             text: `${n.body}\n\n${env.APP_URL}${n.url ?? ''}`,
-            html: simpleHtml(n.title, [n.body], { href: `${env.APP_URL}${n.url ?? ''}`, label: 'Open Bill Calendar' }),
+            html: simpleHtml(n.title, [n.body], { href: `${env.APP_URL}${n.url ?? ''}`, label: 'Open BillFlow' }),
           });
           if (!ok) throw new Error('SMTP not configured');
           break;

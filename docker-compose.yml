@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# SKR's Bill Calendar — self-hosted stack
+# BillFlow — self-hosted stack
 #
 #   cp .env.example .env      # set POSTGRES_PASSWORD (and APP_URL)
 #   docker compose up -d      # open http://<host>:8080
@@ -79,7 +79,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-SKR's Bill Calendar <no-reply@localhost>}
+      SMTP_FROM: ${SMTP_FROM:-BillFlow <no-reply@localhost>}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}

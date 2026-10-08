@@ -47,5 +47,5 @@ export function simpleHtml(title: string, paragraphs: string[], link?: { href: s
     : '';
   return `<!doctype html><html><body style="font-family:system-ui,sans-serif;color:#111827;max-width:560px;margin:auto;padding:24px">
 <h2 style="margin:0 0 16px">${escapeHtml(title)}</h2>${body}${button}
-<p style="color:#6b7280;font-size:12px;margin-top:32px">Sent by SKR's Bill Calendar</p></body></html>`;
+<p style="color:#6b7280;font-size:12px;margin-top:32px">Sent by BillFlow</p></body></html>`;
 }

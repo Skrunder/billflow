@@ -73,7 +73,7 @@ notificationsRouter.post('/test', async (req, res) => {
   const settings = await getSettings(me.id);
   const result: Record<string, string> = {};
   const title = 'Test notification';
-  const body = "Notifications from SKR's Bill Calendar are working.";
+  const body = "Notifications from BillFlow are working.";
 
   if (settings.inAppNotifications) {
     await prisma.notification.create({

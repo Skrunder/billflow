@@ -9,7 +9,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'com.skr.billcalendar',
-  appName: 'Bill Calendar',
+  appName: 'BillFlow',
   webDir: 'dist-standalone',
   server: {
     // Shown instead of the app when the page can't load or the WebView is too old.

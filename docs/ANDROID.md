@@ -21,8 +21,8 @@ Needs only **Docker** and **Node 20+**. The JDK and Android SDK run in a contain
 ```bash
 npm install                        # repo root, once
 scripts/android/new-keystore.sh    # once ever: creates the release signing key (see below)
-scripts/build-apk.sh               # signed release → dist-apk/bill-calendar-<version>.apk
-scripts/build-apk.sh debug         # debug build   → dist-apk/bill-calendar-<version>-debug.apk
+scripts/build-apk.sh               # signed release → dist-apk/billflow-<version>.apk
+scripts/build-apk.sh debug         # debug build   → dist-apk/billflow-<version>-debug.apk
 ```
 
 The script builds the standalone web app, copies it into the Android project (`npx cap sync`),
@@ -42,7 +42,7 @@ a build signed with a new key.
 
 ## Installing on a phone
 
-1. Copy `dist-apk/bill-calendar-<version>.apk` to the phone (USB, Drive, email to yourself, or a link on your LAN).
+1. Copy `dist-apk/billflow-<version>.apk` to the phone (USB, Drive, email to yourself, or a link on your LAN).
 2. Open it. Android asks once to allow installs from that app (Files, Chrome…).
 3. To update, install the newer APK over it. Data is kept.
 
@@ -67,7 +67,7 @@ Debug and release builds are signed with different keys, so switching between th
 
 Optional. Settings → **Server sync** → *Connect to server*:
 
-1. **Server address:** what you open Bill Calendar at in a browser, e.g. `192.168.1.20:8080` or
+1. **Server address:** what you open BillFlow at in a browser, e.g. `192.168.1.20:8080` or
    `https://bills.example.com`. Plain `http://` is accepted only for home-network addresses
    (192.168.x.x, 10.x.x.x, 172.16–31.x.x, `nas.local`, single names like `unraid`), and the app notes
    that it isn't encrypted. Anything reachable from the internet needs `https://`.
@@ -102,7 +102,7 @@ a bill, event or category wins over edits to it. Full rules: `API.md`, *Sync*.
 
 **Troubleshooting:** "Can't reach the server": check the phone is on the same network (or the
 address is reachable over the internet), the port is right, and the server is running
-(`http://<address>/api/health` in the phone's browser shows `"status":"ok"`). "No Bill Calendar
+(`http://<address>/api/health` in the phone's browser shows `"status":"ok"`). "No BillFlow
 server answered": the address points at something else (often a wrong port).
 
 ## Code map
@@ -120,7 +120,7 @@ server answered": the address points at something else (often a wrong port).
 | `frontend/src/sync/SyncProvider.tsx` | Runs the client in the app (when to sync) |
 | `frontend/src/components/sync/` | Settings → Server sync, the header status icon, the web app's *Phones* list |
 | `android/app/src/main/res/xml/` | `network_security_config.xml` (http on the home network), backup rules (no sign-in token in backups) |
-| `scripts/android/icons.py` | Generates launcher icons (pure Python) |
+| `scripts/icons.py` | Draws every icon: web favicon/PWA icons and Android launcher icons (pure Python) |
 | `scripts/android/Dockerfile.emulator` | Headless emulator for tests (needs `/dev/kvm`) |
 
 The server-backed web build never includes this code: `vite.config.ts` swaps
@@ -134,7 +134,7 @@ docker run -d --name skr-emu --device /dev/kvm --network host -e ANDROID_AVD_HOM
   -v "$PWD/dist-apk":/apk:ro,z skr-android-emulator:1 bash -c \
   'mkdir -p $ANDROID_AVD_HOME && echo no | avdmanager create avd -n test -k "system-images;android-36;google_apis;x86_64" -d pixel_6 >/dev/null &&
    exec emulator -avd test -no-window -no-audio -no-boot-anim -gpu swangle_indirect -no-snapshot -no-metrics -memory 3072'
-docker exec skr-emu adb install -r /apk/bill-calendar-<version>-debug.apk
+docker exec skr-emu adb install -r /apk/billflow-<version>-debug.apk
 # Drive the WebView with Chrome DevTools / puppeteer:
 docker exec skr-emu sh -c 'adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof com.skr.billcalendar)'
 ```
@@ -143,6 +143,7 @@ docker exec skr-emu sh -c 'adb forward tcp:9222 localabstract:webview_devtools_r
 emulator-only glitch: with software rendering the dashboard heading sometimes isn't painted on
 screen even though the WebView renders it (visible in a DevTools screenshot).
 
+Checked for 1.5.0 (BillFlow): launcher name and icon, in-app header, release upgrade over 1.4.0.
 Checked for 1.4.0: estimated amounts (create, ✓ opens the payment form with the estimate selected,
 actual amount shown after paying), upgrade from 1.3.1 with data (debug and release).
 Checked for 1.3.1: dialog buttons stack with the main action on top, clear of the 3-button

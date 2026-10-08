@@ -31,8 +31,8 @@ export default defineConfig(({ mode }) => ({
       },
       manifest: {
         id: '/',
-        name: "SKR's Bill Calendar",
-        short_name: 'Bill Calendar',
+        name: "BillFlow",
+        short_name: 'BillFlow',
         description: 'Track bills, recurring payments and events — self-hosted.',
         start_url: '/',
         scope: '/',

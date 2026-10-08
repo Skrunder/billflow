@@ -362,7 +362,7 @@ export async function sendVerificationEmail(user: Pick<User, 'id' | 'email' | 'd
   const link = `${env.APP_URL}/verify-email?token=${token}`;
   await sendMail({
     to: user.email,
-    subject: "Verify your email — SKR's Bill Calendar",
+    subject: "Verify your email — BillFlow",
     text: `Hi ${user.displayName},\n\nConfirm your email address by opening this link:\n${link}\n\nThe link expires in 48 hours.`,
     html: simpleHtml('Verify your email', [`Hi ${user.displayName},`, 'Confirm your email address to finish setting up your account. The link expires in 48 hours.'], {
       href: link,
@@ -386,7 +386,7 @@ export async function requestPasswordReset(email: string) {
   const link = `${env.APP_URL}/reset-password?token=${token}`;
   await sendMail({
     to: user.email,
-    subject: "Reset your password — SKR's Bill Calendar",
+    subject: "Reset your password — BillFlow",
     text: `Someone requested a password reset for your account.\n\nReset it here (valid for 1 hour):\n${link}\n\nIf this wasn't you, ignore this email.`,
     html: simpleHtml('Reset your password', ['Someone requested a password reset for your account. The link is valid for 1 hour.', "If this wasn't you, you can ignore this email."], {
       href: link,

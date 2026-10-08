@@ -35,7 +35,7 @@ interface PushPayload {
 }
 
 self.addEventListener('push', (event) => {
-  let data: PushPayload = { title: "SKR's Bill Calendar", body: 'You have a reminder.' };
+  let data: PushPayload = { title: "BillFlow", body: 'You have a reminder.' };
   try {
     if (event.data) data = { ...data, ...(event.data.json() as PushPayload) };
   } catch {

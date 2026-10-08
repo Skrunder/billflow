@@ -711,7 +711,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
   async function restoreBackup(input: unknown) {
     const b = input as Partial<LocalBackup> | null;
     if (!b || typeof b !== 'object' || b.format !== BACKUP_FORMAT || typeof b.tables !== 'object' || !b.tables) {
-      throw badRequest('This file is not a Bill Calendar backup.');
+      throw badRequest('This file is not a BillFlow backup.');
     }
     if (typeof b.schemaVersion !== 'number' || b.schemaVersion > SCHEMA_VERSION) {
       throw badRequest('This backup was made by a newer version of the app. Update the app, then restore it.');

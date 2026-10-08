@@ -41,6 +41,17 @@ Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen
 * **TrueNAS SCALE (Custom App / Dockge):** edit the app or stack and redeploy. Dockge has an *Update* button.
 * **Synology Container Manager:** Project → *Action → Build* (source) or pull new images, then *Start*.
 
+## Notes for specific versions
+
+### 1.5.0: renamed to BillFlow
+A name and icon change only; data, volumes and settings are untouched.
+* **Email sender:** if your `.env` sets `SMTP_FROM` explicitly, change the display name there yourself (the default is now `BillFlow <no-reply@…>`).
+* **Installed web app (PWA):** browsers refresh the name and icon on their own schedule; on some phones you need to remove the home-screen icon and install it again to see the new one.
+* **Android:** install `billflow-1.5.0.apk` over the old app as usual; it updates in place (same package id and signing key) and keeps your data.
+
+### 1.4.0
+Adds two columns (estimated amounts). Back up first as always; the migration runs on start.
+
 ## Verifying an upgrade
 
 ```bash

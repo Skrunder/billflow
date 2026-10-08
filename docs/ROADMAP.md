@@ -1,6 +1,10 @@
 # Development roadmap & milestones
 
-## ✅ v1.0: Foundation (this release)
+## ✅ Shipped
+
+Releases since 1.0 (Android app, phone sync, estimated amounts, the BillFlow name) are listed in [CHANGELOG.md](../CHANGELOG.md).
+
+### v1.0: Foundation
 
 | Milestone | Scope | Status |
 |---|---|---|
@@ -14,7 +18,7 @@
 | M8 · PWA | Manifest + icons (Android/iOS/maskable), service worker app shell, offline read-only mode with persisted cache, push handling | Done |
 | M9 · Operations | Backup sidecar, backup/restore scripts, JSON export, docs for Unraid/TrueNAS/Synology/Portainer/Proxmox and reverse proxies, CI | Done |
 
-## v1.1: Quality of life
+## Ideas: quality of life
 * iCalendar (`.ics`) subscription feed per user (read-only, token URL) for Google, Apple and Outlook calendars
 * Bulk "mark all due today paid", undo toast
 * Attach receipts/statements to occurrences (uses the existing `/app/data` volume)
@@ -22,7 +26,7 @@
 * Admin page in the UI (user list, disable/enable, registration toggle)
 * Translations (i18n) and locale-aware date input
 
-## v1.2: Notifications+
+## Ideas: notifications+
 * SMS channel (Twilio / generic webhook) via the existing `NotificationChannel.SMS`
 * Ntfy / Gotify / Apprise / Discord webhooks, which suit home labs well
 * Daily digest email ("what's due this week")
@@ -36,7 +40,6 @@
 ## v2.x: Integrations
 * Two-way Google Calendar / Microsoft Graph (Outlook) sync for events, mapping occurrences to RRULE exceptions (`originalDueDate` is the stable recurrence id)
 * Optional OIDC single sign-on (Authelia, Authentik, Keycloak)
-* Native mobile wrapper (Capacitor) on the same `/api/v1`
 * Multi-instance mode: Postgres-backed rate-limit store and a single scheduler leader via advisory lock
 
 ## Engineering standards (ongoing)

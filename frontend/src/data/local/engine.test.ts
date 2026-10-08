@@ -428,7 +428,7 @@ describe('backup and restore', () => {
     await sample();
     const before = await snapshot();
     const backup = await repo.createBackup();
-    await expect(repo.restoreBackup({ hello: 'world' })).rejects.toThrow('not a Bill Calendar backup');
+    await expect(repo.restoreBackup({ hello: 'world' })).rejects.toThrow('not a BillFlow backup');
     await expect(repo.restoreBackup({ ...backup, schemaVersion: 999 })).rejects.toThrow('newer version');
     const damaged = { ...backup, tables: { ...backup.tables, events: [{ id: 'x', title: { evil: true } }] } };
     await expect(repo.restoreBackup(damaged)).rejects.toThrow('damaged');

@@ -1,4 +1,4 @@
-# SKR's Bill Calendar — frontend web server
+# BillFlow — frontend web server
 # Rendered at container start by the nginx entrypoint (envsubst):
 #   ${BACKEND_URL}           where the API container lives (default http://backend:4000)
 #   ${NGINX_LOCAL_RESOLVERS} DNS servers from /etc/resolv.conf (works on Docker and Podman)

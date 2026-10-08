@@ -93,7 +93,7 @@ const schema = z.object({
   SMTP_SECURE: bool(false),
   SMTP_USER: optionalString,
   SMTP_PASSWORD: optionalString,
-  SMTP_FROM: z.string().default("SKR's Bill Calendar <no-reply@localhost>"),
+  SMTP_FROM: z.string().default("BillFlow <no-reply@localhost>"),
 
   VAPID_PUBLIC_KEY: optionalString,
   VAPID_PRIVATE_KEY: optionalString,

@@ -252,11 +252,11 @@ export function createSyncClient(opts: {
         throw new SyncError((err as Error).message, 'invalid');
       }
       const health = await call<{ status?: string; version?: string }>({ method: 'GET', url: `${serverUrl}/api/health`, timeoutMs: 10_000 });
-      if (health.status !== 200 || health.data?.status !== 'ok') throw new SyncError('No Bill Calendar server answered at that address.', 'invalid');
+      if (health.status !== 200 || health.data?.status !== 'ok') throw new SyncError('No BillFlow server answered at that address.', 'invalid');
       // Older servers have no phone sign-in: they'd answer it as if the password were wrong.
       if (!supportsSync(health.data.version)) {
         throw new SyncError(
-          `This server runs Bill Calendar ${health.data.version ?? '(unknown version)'}; phone sync needs ${MIN_SERVER_VERSION} or newer. Update the server, then connect again.`,
+          `This server runs BillFlow ${health.data.version ?? '(unknown version)'}; phone sync needs ${MIN_SERVER_VERSION} or newer. Update the server, then connect again.`,
           'invalid',
         );
       }

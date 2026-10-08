@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # ─────────────────────────────────────────────────────────────────────────────
-# SKR's Bill Calendar — on-demand backup
+# BillFlow — on-demand backup
 #
 # Creates, in ./backups (or $BACKUP_PATH):
 #   billcalendar-<timestamp>.dump      PostgreSQL custom-format dump (all data)

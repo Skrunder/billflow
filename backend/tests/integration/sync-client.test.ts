@@ -249,7 +249,7 @@ describe.skipIf(!enabled)('phone ⇄ server sync (real engine)', () => {
     const oldServer: HttpTransport = async (req) =>
       req.url.endsWith('/api/health') ? { status: 200, data: { status: 'ok', version: '1.0.0' } } : http(req);
     const client = createSyncClient({ repo: C.repo, http: oldServer, secrets: { load: async () => null, save: async () => {}, clear: async () => {} } });
-    await expect(client.prepareConnect('localhost', 'sam@example.com', PASSWORD)).rejects.toThrow('This server runs Bill Calendar 1.0.0; phone sync needs 1.2.0 or newer');
+    await expect(client.prepareConnect('localhost', 'sam@example.com', PASSWORD)).rejects.toThrow('This server runs BillFlow 1.0.0; phone sync needs 1.2.0 or newer');
   });
 
   it('wrong password, unreachable or non-https public servers are explained', async () => {

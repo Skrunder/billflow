@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
-# SKR's Bill Calendar — frontend image
+# BillFlow — frontend image
 # Build context: the REPOSITORY ROOT (the web app depends on packages/core).
 #   docker build -f frontend/Dockerfile .
 # Builds the React PWA and serves it with an unprivileged nginx that also
@@ -38,7 +38,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
 
-LABEL org.opencontainers.image.title="SKR's Bill Calendar Web" \
+LABEL org.opencontainers.image.title="BillFlow Web" \
       org.opencontainers.image.description="Self-hosted bill & event calendar — web frontend (PWA)" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${APP_VERSION}"

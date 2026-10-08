@@ -64,7 +64,7 @@ export function LoginPage() {
   return (
     <AuthCard
       title="Welcome back"
-      subtitle="Sign in to SKR's Bill Calendar"
+      subtitle="Sign in to BillFlow"
       footer={config?.registrationOpen && <>No account? <Link to="/register" className="font-medium text-brand-600 hover:underline">Create one</Link></>}
     >
       <form onSubmit={submit} className="space-y-4">

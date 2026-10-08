@@ -64,7 +64,7 @@ Enables password-reset emails, email verification and email reminders.
 | `SMTP_PORT` | `587` | |
 | `SMTP_SECURE` | `false` | `true` for port 465 (implicit TLS); `false` uses STARTTLS. |
 | `SMTP_USER` / `SMTP_PASSWORD` | – | Use an app password for Gmail and similar. |
-| `SMTP_FROM` | `SKR's Bill Calendar <no-reply@localhost>` | Sender address. |
+| `SMTP_FROM` | `BillFlow <no-reply@localhost>` | Sender address. |
 
 ## Web Push (optional)
 

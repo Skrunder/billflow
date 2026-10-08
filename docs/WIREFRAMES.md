@@ -6,8 +6,8 @@ These describe the shipped UI. Desktop (≥ 768 px) uses a left sidebar. Mobile 
 
 ```
 ┌──────────────┬──────────────────────────────────────────────────────────┐
-│ [icon] SKR's │                                          🔔(2)  [+ New ▾]│
-│ Bill Calendar├──────────────────────────────────────────────────────────┤
+│ [icon]       │                                          🔔(2)  [+ New ▾]│
+│ BillFlow     ├──────────────────────────────────────────────────────────┤
 │              │ ⚠ You're offline — showing saved data.   (only offline)  │
 │ ▣ Dashboard  │                                                          │
 │ ▦ Calendar   │                    <page content>                        │

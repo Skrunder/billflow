@@ -311,7 +311,7 @@ function PhoneReminderSettings({ enabled, onSave }: { enabled: boolean; onSave: 
   const toggle = async (on: boolean) => {
     if (!on) return onSave({ pushNotifications: false }, 'Phone notifications off');
     if (await phone.requestPermission()) onSave({ pushNotifications: true }, 'Phone notifications on');
-    else toast.error('Notifications are blocked. Allow them for Bill Calendar in Android settings.');
+    else toast.error('Notifications are blocked. Allow them for BillFlow in Android settings.');
     refresh();
   };
 
@@ -322,7 +322,7 @@ function PhoneReminderSettings({ enabled, onSave }: { enabled: boolean; onSave: 
         label="Phone notifications"
         description={
           blocked
-            ? 'Blocked in Android settings (Apps → Bill Calendar → Notifications).'
+            ? 'Blocked in Android settings (Apps → BillFlow → Notifications).'
             : 'Reminders pop up on this phone at their reminder time, even when the app is closed.'
         }
         checked={enabled && status?.permission === 'granted'}
@@ -423,7 +423,7 @@ function BackupSection() {
     try {
       const data = await repo.createBackup();
       const stamp = data.createdAt.slice(0, 16).replace(/[T:]/g, '-');
-      await saveFile(`bill-calendar-backup-${stamp}.json`, JSON.stringify(data), 'application/json');
+      await saveFile(`billflow-backup-${stamp}.json`, JSON.stringify(data), 'application/json');
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -436,7 +436,7 @@ function BackupSection() {
       const data = JSON.parse(await file.text()) as { createdAt?: unknown };
       setPending({ name: file.name, data, createdAt: typeof data?.createdAt === 'string' ? data.createdAt : null });
     } catch {
-      toast.error('This file is not a Bill Calendar backup.');
+      toast.error('This file is not a BillFlow backup.');
     }
   };
 
@@ -497,7 +497,7 @@ function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; c
   const exportData = async () => {
     try {
       const data = await exporter.mutateAsync();
-      await saveFile(`bill-calendar-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
+      await saveFile(`billflow-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
     } catch (err) {
       toast.error(errorMessage(err));
     }

@@ -1,4 +1,6 @@
-# SKR's Bill Calendar
+# BillFlow
+
+*Formerly SKR's Bill Calendar.* See [CHANGELOG.md](CHANGELOG.md) for what's new.
 
 A self-hosted bill and event calendar for home labs. Track one-time and recurring bills, birthdays, paydays and appointments, see everything on a calendar, mark each occurrence paid or completed on its own, and get reminders. It installs as a mobile/desktop app (PWA) and runs entirely in Docker.
 
