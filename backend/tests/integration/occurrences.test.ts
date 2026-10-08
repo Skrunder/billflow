@@ -400,7 +400,7 @@ describe.skipIf(!enabled)('API integration', () => {
       for (let round = 0; round < 25; round++) {
         const results = await Promise.all([refresh(cookie, csrf), refresh(cookie, csrf), refresh(cookie, csrf)]);
         expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
-        cookie = cookieOf(results[round % 3]);
+        cookie = cookieOf(results[round % 3]!);
       }
     });
 
