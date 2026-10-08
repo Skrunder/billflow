@@ -162,3 +162,25 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+/**
+ * Standalone (on-device) mode: there is no server account, so the device
+ * owner is always "signed in" and the sign-in/out functions do nothing.
+ */
+export function LocalAuthProvider({ user, children }: { user: User; children: ReactNode }) {
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status: 'authenticated',
+      user,
+      login: async () => {
+        throw new Error('Signing in is not available in standalone mode');
+      },
+      register: async () => {
+        throw new Error('Accounts are not available in standalone mode');
+      },
+      logout: async () => undefined,
+      expireSession: () => undefined,
+    }),
+    [user],
+  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}

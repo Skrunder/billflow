@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** M1 (shared core) and M2 (data layer) done. Next: M3.
+**Status:** M1 (shared core), M2 (data layer) and M3 (local engine) done. Next: M4, the first APK.
 
 ---
 
@@ -66,7 +66,7 @@
 * `RemoteRepository` wraps today's REST calls, so the web app behaves exactly as now.
 * The UI talks only to the interface.
 
-### M3 · Local engine (standalone, runs in the browser for development)
+### M3 · Local engine (standalone, runs in the browser for development) ✅ done
 * SQLite schema mirroring the server tables, plus `outbox` and `sync_state`.
 * `LocalRepository` implements everything locally: occurrence generation and horizon extension, per-occurrence complete/skip/reopen/edit with audit history, dashboard and calendar queries, categories with defaults, settings, auto-pay.
 * Tests: the same independence and integrity tests as the server suite, run against the local engine.

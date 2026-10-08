@@ -1,6 +1,7 @@
 # Dependencies & builds
 node_modules/
 dist/
+dist-standalone/
 dev-dist/
 coverage/
 *.tsbuildinfo
@@ -9,6 +10,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!frontend/.env.standalone
 backups/
 backend/data/
 

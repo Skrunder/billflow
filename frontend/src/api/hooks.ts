@@ -49,8 +49,8 @@ export function invalidateData(qc: QueryClient) {
 
 // ─────────────────────────────────────────── account (server only) ──
 
-export const useServerConfig = () =>
-  useQuery({ queryKey: ['config'], queryFn: account.getServerConfig, staleTime: 60_000 });
+export const useServerConfig = (enabled = true) =>
+  useQuery({ queryKey: ['config'], queryFn: account.getServerConfig, staleTime: 60_000, enabled });
 
 export const useChangePassword = () =>
   useMutation({

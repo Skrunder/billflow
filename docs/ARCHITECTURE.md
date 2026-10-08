@@ -129,7 +129,7 @@ main.tsx
 
 * **Data layer:** screens never call HTTP directly. They use the React Query hooks in `src/api/hooks.ts`, which call a **`DataRepository`** (`src/data/repository.ts`) supplied by `<RepositoryProvider>`:
   * `RemoteRepository` (`src/data/remote.ts`) maps each method to exactly one REST call, and a contract test pins every request. The web app uses it.
-  * A `LocalRepository` backed by the on-device database will implement the same interface for the Android app.
+  * `LocalRepository` (`src/data/local/engine.ts`) is the whole app engine on the device's own SQLite database (`schema.ts`), behaving like the server route for route and using the same `@skr/core` rules. It covers occurrence generation and reconciliation, per-occurrence history, auto-pay, the in-app reminder inbox, the dashboard and calendar, validation and export. Occurrence ids are deterministic (UUIDv5 of template + slot), so device and server agree on them. Every call is serialised and runs in one SQL transaction. It reaches SQLite through a tiny `SqlDriver` interface: `sql.js` (WebAssembly, with an IndexedDB snapshot) in browsers and tests, and native SQLite on Android (milestone 4). Changes are logged to an `outbox` table for the future sync.
 
   Server-only account features (sign-in, registration, password reset, email verification, sign out everywhere, account deletion, test notifications) live in `src/data/account.ts`, and push subscriptions in `src/lib/push.ts`, so a standalone install can hide them. `src/api/client.ts` is the fetch wrapper: in-memory access token, single-flight silent refresh on 401, and a 409 multi-tab retry. Mutations invalidate all dependent views (dashboard, calendar, lists, history).
 * **Offline:** the service worker precaches the app shell. Query results are persisted to localStorage per user and wiped on sign-out or account switch. When the server is unreachable at startup, the app opens in read-only *offline* mode with the cached data and reconnects automatically.
@@ -175,6 +175,7 @@ main.tsx
         ├── main.tsx · App.tsx · sw.ts · queryClient.ts · index.css
         ├── api/                # HTTP client + React Query hooks (types come from @skr/core)
         ├── data/               # DataRepository interface, RemoteRepository, account (server-only), provider
+        │   └── local/          # standalone engine: schema, SqlDriver, sql.js driver, LocalRepository
         ├── auth/AuthProvider.tsx
         ├── hooks/              # settings/theme/online, canEdit
         ├── lib/                # push

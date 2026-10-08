@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { errorMessage } from '../api/client';
 import { useChangePassword, useExportData, useMe, useServerConfig, useUpdateProfile, useUpdateSettings } from '../api/hooks';
 import * as account from '../data/account';
+import { useRepository } from '../data/RepositoryProvider';
 import type { CalendarView, Settings, Theme } from '@skr/core';
 import { useAuth } from '../auth/AuthProvider';
 import { ReminderEditor } from '../components/shared/ReminderEditor';
@@ -29,7 +30,8 @@ const CURRENCIES = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'NZD', 'JPY', 'CHF', 'SEK
 
 export function SettingsPage() {
   const { data, isLoading } = useMe();
-  const { data: config } = useServerConfig();
+  const standalone = useRepository().kind === 'local';
+  const { data: config } = useServerConfig(!standalone);
   const { expireSession } = useAuth();
   const update = useUpdateSettings();
   const toast = useToast();
@@ -58,7 +60,7 @@ export function SettingsPage() {
     <>
       <PageHeader title="Settings" subtitle={update.isPending ? <span className="inline-flex items-center gap-1"><Spinner className="h-3 w-3" /> Saving…</span> : 'Changes save automatically.'} />
       <fieldset disabled={!canEdit} className="space-y-5">
-        <ProfileSection displayName={data.user.displayName} email={data.user.email} />
+        <ProfileSection displayName={data.user.displayName} email={standalone ? null : data.user.email} />
 
         <Section title="Region & time" description="All dates, reminders and calendar views use your timezone.">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -155,17 +157,23 @@ export function SettingsPage() {
           </div>
         </Section>
 
-        <NotificationSection settings={s} pushServer={Boolean(config?.pushEnabled)} emailServer={Boolean(config?.emailNotificationsEnabled)} onSave={save} />
+        {standalone ? (
+          <Section title="Notifications" description="Reminders that are due appear under the bell icon.">
+            <Toggle label="In-app notifications" checked={s.inAppNotifications} onChange={(v) => save({ inAppNotifications: v })} />
+          </Section>
+        ) : (
+          <NotificationSection settings={s} pushServer={Boolean(config?.pushEnabled)} emailServer={Boolean(config?.emailNotificationsEnabled)} onSave={save} />
+        )}
 
-        <SecuritySection onReauth={expireSession} />
+        {!standalone && <SecuritySection onReauth={expireSession} />}
 
-        <DataSection onDeleted={expireSession} />
+        <DataSection onDeleted={expireSession} canDeleteAccount={!standalone} />
       </fieldset>
     </>
   );
 }
 
-function ProfileSection({ displayName, email }: { displayName: string; email: string }) {
+function ProfileSection({ displayName, email }: { displayName: string; email: string | null }) {
   const update = useUpdateProfile();
   const toast = useToast();
   const [name, setName] = useState(displayName);
@@ -188,7 +196,7 @@ function ProfileSection({ displayName, email }: { displayName: string; email: st
             </div>
           )}
         </Field>
-        <Field label="Email">{(id) => <input id={id} className="input" value={email} disabled />}</Field>
+        {email !== null && <Field label="Email">{(id) => <input id={id} className="input" value={email} disabled />}</Field>}
       </form>
     </Section>
   );
@@ -330,7 +338,7 @@ function SecuritySection({ onReauth }: { onReauth: () => void }) {
   );
 }
 
-function DataSection({ onDeleted }: { onDeleted: () => void }) {
+function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; canDeleteAccount: boolean }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -373,9 +381,11 @@ function DataSection({ onDeleted }: { onDeleted: () => void }) {
         <button type="button" className="btn-secondary" onClick={exportData}>
           <Download className="h-4 w-4" aria-hidden /> Export all data (JSON)
         </button>
-        <button type="button" className="btn-secondary text-red-600" onClick={() => setOpen(true)}>
-          Delete account
-        </button>
+        {canDeleteAccount && (
+          <button type="button" className="btn-secondary text-red-600" onClick={() => setOpen(true)}>
+            Delete account
+          </button>
+        )}
       </div>
       <Modal open={open} onClose={() => setOpen(false)} title="Delete your account?" size="sm">
         <form onSubmit={deleteAccount} className="space-y-4">

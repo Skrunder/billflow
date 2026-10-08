@@ -1,10 +1,18 @@
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  resolve: {
+    // Only the standalone build bundles the on-device database (sql.js + WebAssembly).
+    alias:
+      mode === 'standalone'
+        ? []
+        : [{ find: /^\.\/data\/local\/browser$/, replacement: fileURLToPath(new URL('./src/data/local/browser.stub.ts', import.meta.url)) }],
+  },
   plugins: [
     react(),
     VitePWA({
@@ -16,7 +24,7 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg', 'theme-init.js', 'icons/apple-touch-icon.png'],
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,wasm}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       manifest: {
@@ -49,6 +57,8 @@ export default defineConfig({
     proxy: { '/api': { target: process.env.VITE_API_PROXY ?? 'http://localhost:4000', changeOrigin: false } },
   },
   build: {
+    // The standalone app (on-device database) is built separately.
+    outDir: mode === 'standalone' ? 'dist-standalone' : 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 900,
     rollupOptions: {
@@ -68,4 +78,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

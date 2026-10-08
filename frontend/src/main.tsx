@@ -1,12 +1,13 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
-import { AuthProvider } from './auth/AuthProvider';
-import { RepositoryProvider } from './data/RepositoryProvider';
+import { AuthProvider, LocalAuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ui/Toast';
+import { RepositoryProvider } from './data/RepositoryProvider';
+import type { DataRepository } from './data/repository';
 import './index.css';
 import { CACHE_MAX_AGE, persister, queryClient } from './queryClient';
 
@@ -15,21 +16,61 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   registerSW({ immediate: true });
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister, maxAge: CACHE_MAX_AGE, buster: __APP_VERSION__ }}
-    >
-      <BrowserRouter>
-        <ToastProvider>
-          <AuthProvider>
-            <RepositoryProvider>
-              <App />
-            </RepositoryProvider>
-          </AuthProvider>
-        </ToastProvider>
-      </BrowserRouter>
-    </PersistQueryClientProvider>
-  </StrictMode>,
-);
+/**
+ * Data source: the self-hosted server (default) or, in the "standalone"
+ * build, the on-device database with no account at all.
+ */
+const STANDALONE = import.meta.env.VITE_DATA_SOURCE === 'local';
+
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <StrictMode>
+      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: CACHE_MAX_AGE, buster: __APP_VERSION__ }}>
+        <BrowserRouter>
+          <ToastProvider>{children}</ToastProvider>
+        </BrowserRouter>
+      </PersistQueryClientProvider>
+    </StrictMode>
+  );
+}
+
+async function bootstrap() {
+  const root = createRoot(document.getElementById('root')!);
+  if (!STANDALONE) {
+    root.render(
+      <Shell>
+        <AuthProvider>
+          <RepositoryProvider>
+            <App />
+          </RepositoryProvider>
+        </AuthProvider>
+      </Shell>,
+    );
+    return;
+  }
+
+  try {
+    const { openBrowserLocalRepository } = await import('./data/local/browser');
+    const repository: DataRepository = await openBrowserLocalRepository();
+    const { user } = await repository.getProfile();
+    root.render(
+      <Shell>
+        <LocalAuthProvider user={user}>
+          <RepositoryProvider repository={repository}>
+            <App />
+          </RepositoryProvider>
+        </LocalAuthProvider>
+      </Shell>,
+    );
+  } catch (err) {
+    console.error(err);
+    root.render(
+      <div role="alert" style={{ padding: 24, fontFamily: 'system-ui' }}>
+        <h1>Could not open your data</h1>
+        <p>{(err as Error).message}</p>
+      </div>,
+    );
+  }
+}
+
+void bootstrap();

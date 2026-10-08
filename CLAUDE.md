@@ -18,6 +18,7 @@ SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monor
 6. Pin dependency versions exactly.
 7. **Screens never call the server directly.** UI code uses the hooks in `frontend/src/api/hooks.ts`, which go through `DataRepository` (`frontend/src/data/`). New data operations must be added to the interface *and* to every implementation, plus the contract test in `frontend/src/data/remote.test.ts`. Server-only account features belong in `frontend/src/data/account.ts`.
 8. Buttons inside forms must have an explicit `type`. A bare `<button>` submits the form.
+9. **Server and device engines must stay in step.** Any change to how the API behaves (`backend/src/modules`, `backend/src/services`) needs the same change in the on-device engine (`frontend/src/data/local/engine.ts`, plus a new step in `schema.ts` for data-shape changes), with tests on both sides. Shared rules go in `@skr/core`, not into either engine.
 
 ## Commands
 ```bash
@@ -28,7 +29,8 @@ TEST_DATABASE_URL=postgresql://test:test@localhost:55432/billcal_test npm test -
 #   test DB: docker run -d --rm --name skr-test-db -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=billcal_test -p 55432:5432 postgres:16-alpine
 #   then:    (cd backend && DATABASE_URL=$TEST_DATABASE_URL npx prisma migrate deploy)
 npm run typecheck -w backend && npm run typecheck -w frontend
-npm run build -w frontend
+npm run build -w frontend                      # server-backed web app
+npm run dev:standalone -w frontend             # standalone app on the on-device engine (browser)
 docker compose build && docker compose up -d   # images build from the repo root
 ```
 

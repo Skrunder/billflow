@@ -2,6 +2,7 @@
 # never send secrets, data or local builds to the Docker daemon.
 **/node_modules
 **/dist
+**/dist-standalone
 **/dev-dist
 **/coverage
 **/*.log

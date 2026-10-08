@@ -108,6 +108,9 @@ npm run dev                      # builds @skr/core first
 # Frontend (http://localhost:5173, proxies /api to :4000)
 cd frontend && npm run dev
 
+# Standalone app (no server, data kept in the browser): http://localhost:5173
+cd frontend && npm run dev:standalone        # build: npm run build:standalone → dist-standalone/
+
 # Editing packages/core? Rebuild it on change in another terminal:
 npm run dev -w @skr/core
 ```

@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useUnreadCount } from '../../api/hooks';
+import { useRepository } from '../../data/RepositoryProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { useOnline, useSettings, useThemeSync } from '../../hooks/useSettings';
 
@@ -71,7 +72,9 @@ export function AppLayout() {
   const { user, logout, status } = useAuth();
   const settings = useSettings();
   const online = useOnline();
-  const offline = status === 'offline' || !online;
+  const standalone = useRepository().kind === 'local';
+  // The on-device database never depends on the network.
+  const offline = !standalone && (status === 'offline' || !online);
   const { data: unread } = useUnreadCount(!offline);
   useThemeSync(settings.theme);
 
@@ -113,10 +116,16 @@ export function AppLayout() {
         </nav>
         <div className="border-t border-slate-200 p-3 dark:border-slate-800">
           <div className="truncate px-3 text-sm font-medium">{user?.displayName}</div>
-          <div className="truncate px-3 text-xs text-slate-500">{user?.email}</div>
-          <button className="btn-ghost mt-2 w-full justify-start" onClick={() => void logout()}>
-            <LogOut className="h-4 w-4" aria-hidden /> Sign out
-          </button>
+          {standalone ? (
+            <div className="px-3 text-xs text-slate-500">Data stored on this device</div>
+          ) : (
+            <>
+              <div className="truncate px-3 text-xs text-slate-500">{user?.email}</div>
+              <button className="btn-ghost mt-2 w-full justify-start" onClick={() => void logout()}>
+                <LogOut className="h-4 w-4" aria-hidden /> Sign out
+              </button>
+            </>
+          )}
         </div>
       </aside>
 
