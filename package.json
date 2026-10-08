@@ -17,5 +17,8 @@
     "build:core": "npm run build -w @skr/core",
     "test": "npm run build:core && npm test --workspaces",
     "typecheck": "npm run build:core && npm run typecheck --workspaces"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
   }
 }

@@ -29,8 +29,15 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function PublicOnly({ children }: { children: ReactNode }) {
   const { status } = useAuth();
+  const location = useLocation();
   if (status === 'loading') return <FullPageSpinner />;
-  if (status === 'authenticated' || status === 'offline') return <Navigate to="/" replace />;
+  if (status === 'authenticated' || status === 'offline') {
+    // Return to the page that required signing in (set by RequireAuth). This
+    // redirect, not the login form, must decide: React Router 7 schedules
+    // navigations as transitions, so it runs first.
+    const from = (location.state as { from?: string } | null)?.from;
+    return <Navigate to={from && from.startsWith('/') && !from.startsWith('//') ? from : '/'} replace />;
+  }
   return <>{children}</>;
 }
 
