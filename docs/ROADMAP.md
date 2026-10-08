@@ -39,6 +39,9 @@
 * Native mobile wrapper (Capacitor) on the same `/api/v1`
 * Multi-instance mode: Postgres-backed rate-limit store and a single scheduler leader via advisory lock
 
+## Backlog (bookmarked)
+* **Tailwind CSS 3 → 4 migration.** Clears the last 7 `npm audit` findings, all build-time only and with no fix within Tailwind 3: `braces` (no fixed release exists), `micromatch`, `chokidar`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`. Tailwind 4 drops that toolchain, but it changes configuration (CSS-first `@theme`), the PostCSS/Vite integration, and some utility and `@apply` behaviour, so it's a styling migration that needs a visual check of every screen in light and dark mode. Production dependencies already audit clean. Deferred on 2026-10-07.
+
 ## Engineering standards (ongoing)
 * Every change: typecheck, unit and integration tests in CI, image build
 * Migrations follow expand → migrate → contract; no destructive change outside a major version
