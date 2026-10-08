@@ -53,14 +53,16 @@ async function bootstrap() {
   }
 
   try {
-    const { openDeviceRepository } = await import('./data/local/browser');
-    const repository: DataRepository = await openDeviceRepository();
+    const [{ openDeviceRepository }, { SyncProvider }] = await Promise.all([import('./data/local/browser'), import('./sync/SyncProvider')]);
+    const repository = await openDeviceRepository();
     const { user } = await repository.getProfile();
     root.render(
       <Shell>
         <LocalAuthProvider user={user}>
-          <RepositoryProvider repository={repository}>
-            <App />
+          <RepositoryProvider repository={repository as DataRepository}>
+            <SyncProvider repo={repository}>
+              <App />
+            </SyncProvider>
           </RepositoryProvider>
         </LocalAuthProvider>
       </Shell>,

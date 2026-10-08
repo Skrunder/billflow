@@ -13,6 +13,9 @@ import { ErrorNotice, Field, PageHeader, Segmented, Toggle } from '../components
 import { LoadingBlock, Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import { useCanEdit } from '../hooks/useCanEdit';
+import { PhonesSection } from '../components/sync/PhonesSection';
+import { ServerSyncSection } from '../components/sync/ServerSyncSection';
+import { useSyncClient } from '../sync/context';
 import { applyTheme } from '../hooks/useSettings';
 import { currentSubscription, pushSupported, subscribeToPush, unsubscribeFromPush } from '../lib/push';
 import { getPhoneReminders, saveFile, type PhoneReminderStatus } from '../native/device';
@@ -39,6 +42,7 @@ export function SettingsPage() {
   const update = useUpdateSettings();
   const toast = useToast();
   const canEdit = useCanEdit();
+  const syncClient = useSyncClient();
 
   const timezones = useMemo(() => {
     try {
@@ -62,7 +66,8 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle={update.isPending ? <span className="inline-flex items-center gap-1"><Spinner className="h-3 w-3" /> Saving…</span> : 'Changes save automatically.'} />
-      <fieldset disabled={!canEdit} className="space-y-5">
+      {/* min-w-0: a fieldset otherwise grows to fit its widest content (e.g. a long phone name) */}
+      <fieldset disabled={!canEdit} className="min-w-0 space-y-5">
         <ProfileSection displayName={data.user.displayName} email={standalone ? null : data.user.email} />
 
         <Section title="Region & time" description="All dates, reminders and calendar views use your timezone.">
@@ -171,7 +176,9 @@ export function SettingsPage() {
           <NotificationSection settings={s} pushServer={Boolean(config?.pushEnabled)} emailServer={Boolean(config?.emailNotificationsEnabled)} onSave={save} />
         )}
 
+        {standalone && syncClient && <ServerSyncSection />}
         {!standalone && <SecuritySection onReauth={expireSession} />}
+        {!standalone && <PhonesSection />}
 
         <DataSection onDeleted={expireSession} canDeleteAccount={!standalone} />
         {standalone && <BackupSection />}

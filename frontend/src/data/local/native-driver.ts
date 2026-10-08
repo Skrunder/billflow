@@ -35,15 +35,24 @@ export function createNativeSqliteDriver(conn: SQLiteDBConnection, onClose?: () 
 
 /**
  * Splits a migration script into single statements: drops `--` comments and
- * splits on `;`. Migration scripts contain no string literals with `;` or
- * `--` and no triggers; keep it that way (see schema.ts).
+ * splits on `;`, keeping CREATE TRIGGER … END bodies whole. Migration scripts
+ * contain no string literals with `;` or `--`; keep it that way (schema.ts).
  */
 export function splitStatements(script: string): string[] {
-  return script
+  const parts = script
     .split('\n')
     .map((line) => line.replace(/--.*$/, ''))
     .join('\n')
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean);
+    .split(';');
+  const out: string[] = [];
+  let pending = '';
+  for (const part of parts) {
+    pending = pending ? `${pending};${part}` : part;
+    const stmt = pending.trim();
+    if (/^CREATE\s+TRIGGER\b/i.test(stmt) && !/\bEND$/i.test(stmt)) continue;
+    if (stmt) out.push(stmt);
+    pending = '';
+  }
+  if (pending.trim()) out.push(pending.trim());
+  return out;
 }

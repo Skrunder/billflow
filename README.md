@@ -22,7 +22,7 @@ docker compose up -d
 | **Multi-user** | Separate accounts with isolated data, categories and settings. The first account becomes the admin. Registration can be closed. |
 | **Security** | bcrypt passwords, short-lived JWT access tokens held in memory, rotating httpOnly refresh cookies with reuse detection, CSRF protection, rate limiting, account lockout, strict CSP and security headers, non-root read-only containers. |
 | **PWA** | Installable on Android, iPhone/iPad and desktop. Previously viewed data stays readable offline. Supports push notifications and light/dark mode. |
-| **Android app** | Standalone APK that needs no server: data in SQLite on the phone, reminders as Android notifications, backup/restore to a file. See [docs/ANDROID.md](docs/ANDROID.md). |
+| **Android app** | Works without a server (data in SQLite on the phone, reminders as Android notifications, backup/restore to a file) and can optionally sync both ways with your server, offline-first. See [docs/ANDROID.md](docs/ANDROID.md). |
 | **Operations** | Health checks, structured JSON logs, automatic migrations, startup config validation, a backup sidecar, backup/restore scripts, an admin CLI and JSON data export. |
 
 ## Quick start

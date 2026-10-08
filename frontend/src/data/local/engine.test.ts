@@ -76,7 +76,7 @@ describe('first start', () => {
   });
 
   it('implements every DataRepository method', () => {
-    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'getUpcomingReminders', 'createBackup', 'restoreBackup', 'close'].includes(k)).sort();
+    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'getUpcomingReminders', 'createBackup', 'restoreBackup', 'sync', 'subscribeChanges', 'close'].includes(k)).sort();
     expect(local).toEqual(Object.keys(createRemoteRepository()).sort());
     expect(repo.kind).toBe('local');
   });
@@ -266,6 +266,56 @@ describe('sync bookkeeping', () => {
     clock = new Date('2026-10-10T12:00:00.000Z');
     await repo.reopenBillOccurrence(feb!.id);
     expect((await row(feb!.id)).status_changed_at).toBe('2026-10-10T12:00:00.000Z');
+  });
+});
+
+describe('sync storage', () => {
+  it('queues nothing until connected', async () => {
+    await repo.createBill(bill());
+    expect(await repo.sync.pendingCount()).toBe(0);
+  });
+
+  it('queues local changes (parents first), but not data written from the server', async () => {
+    await repo.sync.setState({ deviceId: 'phone-1' });
+    const b = await repo.createBill(bill());
+    const [first] = await repo.listBillOccurrences({ billId: b.id });
+    await repo.completeBillOccurrence(first!.id, {});
+    const batch = (await repo.sync.collectPush(1000))!;
+    expect(Object.keys(batch.changes)).toEqual(['bills', 'billOccurrences', 'auditLogs']);
+    expect(batch.changes.billOccurrences).toHaveLength(3);
+    await repo.sync.applyPushResult(batch, { applied: 0, adopt: [], remove: [], remapped: [], conflicts: 0 });
+    expect(await repo.sync.pendingCount()).toBe(0);
+
+    // A server change to that occurrence is applied but not queued again.
+    const paid = batch.changes.billOccurrences!.find((o) => o.id === first!.id)!;
+    await repo.sync.applyPull({
+      changes: { settings: null, categories: [], bills: [], events: [], eventOccurrences: [], auditLogs: [], billOccurrences: [{ ...paid, notes: 'from the web', updatedAt: '2026-10-07T16:00:00.000Z' }] },
+      deletes: [{ entity: 'bills', id: b.id }],
+      cursor: '42',
+      hasMore: false,
+      serverTime: '2026-10-07T16:00:00.000Z',
+    });
+    expect(await repo.sync.pendingCount()).toBe(0);
+    expect(await repo.listBills({})).toEqual([]);
+    expect((await repo.sync.getState()).cursor).toBe('42');
+
+    // Deleting locally queues a delete.
+    const e = await repo.createEvent(event());
+    await repo.deleteEvent(e.id);
+    const next = (await repo.sync.collectPush(1000))!;
+    expect(next.deletes).toEqual(expect.arrayContaining([expect.objectContaining({ entity: 'events', id: e.id })]));
+    expect(next.deletes.every((d) => d.entity === 'events' || d.entity === 'eventOccurrences')).toBe(true);
+  });
+
+  it('backups never contain the server connection; restoring disconnects', async () => {
+    await repo.sync.setState({ serverUrl: 'http://192.168.1.2:7070', deviceId: 'd', cursor: '9' });
+    await repo.createBill(bill());
+    const backup = await repo.createBackup();
+    expect(Object.keys(backup.tables)).not.toEqual(expect.arrayContaining(['outbox']));
+    expect(backup.tables).not.toHaveProperty('sync_state');
+    await repo.restoreBackup(backup);
+    expect(await repo.sync.getState()).toEqual({});
+    expect(await repo.sync.pendingCount()).toBe(0);
   });
 });
 

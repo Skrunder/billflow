@@ -65,6 +65,7 @@ import {
   type SettingsModel,
 } from './models';
 import { migrate, SCHEMA_VERSION } from './schema';
+import { createSyncStore, type SyncStore } from './sync-store';
 
 /**
  * LocalRepository — the full app engine running on the device's own SQLite
@@ -126,9 +127,9 @@ const BACKUP_TABLES = [
   'event_occurrences',
   'notifications',
   'audit_logs',
-  'outbox',
-  'sync_state',
 ] as const;
+/** Server-sync bookkeeping: never in backups (it holds the server connection). */
+const SYNC_TABLES = ['outbox', 'sync_base', 'sync_state'] as const;
 
 export type LocalRepository = DataRepository & {
   /** Auto-pay, horizon extension and due reminders. Runs automatically about once a minute. */
@@ -139,6 +140,10 @@ export type LocalRepository = DataRepository & {
   createBackup(): Promise<LocalBackup>;
   /** Replaces everything on this device with a backup. All or nothing. */
   restoreBackup(backup: unknown): Promise<void>;
+  /** Server sync storage (used by src/sync/client.ts). Each call is one transaction. */
+  sync: SyncStore;
+  /** Runs `fn` after every call that changed data (like the onChange option). Returns an unsubscribe function. */
+  subscribeChanges(fn: () => void): () => void;
   close(): Promise<void>;
 };
 
@@ -186,6 +191,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
   const now = () => options.clock?.() ?? new Date();
   const horizonDays = options.horizonDays ?? DEFAULT_HORIZON_DAYS;
   let lastMaintenance = 0;
+  const changeListeners = new Set<() => void>(options.onChange ? [options.onChange] : []);
 
   // ─────────────────────────────────────────────── low-level helpers ──
 
@@ -226,10 +232,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     });
   }
 
-  /** Records a change for the future server sync (milestone 6). */
-  async function outbox(entityType: EntityType, entityId: string, op: 'upsert' | 'delete' = 'upsert') {
-    await run('INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES (?, ?, ?, ?)', [entityType, entityId, op, now().toISOString()]);
-  }
 
   // Serialise every public call and wrap it in one transaction.
   let queue: Promise<unknown> = Promise.resolve();
@@ -242,7 +244,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const value = await fn();
         await db.exec('COMMIT');
         db.afterWrite?.();
-        if (changed) options.onChange?.();
+        if (changed) for (const fn of changeListeners) fn();
         return value;
       } catch (err) {
         await db.exec('ROLLBACK');
@@ -573,7 +575,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
       const stamp = now().toISOString();
       await update('bill_occurrences', o.id, { status: 'COMPLETED', completedAt: o.autopayAt, amountPaid: o.amount, statusChangedAt: stamp, updatedAt: stamp });
       await audit('BILL_OCCURRENCE', o.id, 'AUTOPAY_COMPLETED', { status: { from: 'PENDING', to: 'COMPLETED' } }, 'SYSTEM');
-      await outbox('BILL_OCCURRENCE', o.id);
     }
   }
 
@@ -718,6 +719,9 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     await run(`UPDATE event_occurrences SET status_changed_at = COALESCE(completed_at, cancelled_at, updated_at) WHERE status <> 'UPCOMING' AND status_changed_at IS NULL`);
     // Pick up anything the backup's age left behind (horizon, auto-pay, due reminders).
     await maintenance();
+    // A restored phone is a different data set: it disconnects from any server
+    // (reconnecting offers to combine or replace) and nothing is queued for upload.
+    for (const t of SYNC_TABLES) await db.run(`DELETE FROM ${t}`);
   }
 
   async function maintenance() {
@@ -803,7 +807,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     const stamp = now().toISOString();
     await update('bill_occurrences', o.id, { ...patch, ...('status' in patch ? { statusChangedAt: stamp } : {}), updatedAt: stamp });
     await audit('BILL_OCCURRENCE', o.id, action, changes);
-    await outbox('BILL_OCCURRENCE', o.id);
   }
 
   async function transitionEvent(o: EventOccurrenceModel, patch: Partial<EventOccurrenceModel>, action: string) {
@@ -811,7 +814,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     const stamp = now().toISOString();
     await update('event_occurrences', o.id, { ...patch, ...('status' in patch ? { statusChangedAt: stamp } : {}), updatedAt: stamp });
     await audit('EVENT_OCCURRENCE', o.id, action, changes);
-    await outbox('EVENT_OCCURRENCE', o.id);
   }
 
   /** Extends recurring series on demand when a view asks for dates past the horizon. */
@@ -881,7 +883,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const user = await getUser();
         await run('UPDATE profile SET display_name = ? WHERE id = ?', [body.displayName, user.id]);
         await audit('USER', user.id, 'PROFILE_UPDATED', body);
-        await outbox('USER', user.id);
         return getUser();
       }),
 
@@ -892,7 +893,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         await update('settings', '1', { ...body, updatedAt: now().toISOString() });
         const after = await getSettingsModel();
         await audit('SETTINGS', 'settings', 'SETTINGS_UPDATED', diff(before, body));
-        await outbox('SETTINGS', 'settings');
         if (before.timezone !== after.timezone || before.allDayReminderTime !== after.allDayReminderTime) await recomputeInstants(after);
         return after;
       }),
@@ -933,7 +933,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         };
         await insert('categories', category);
         await audit('CATEGORY', category.id, 'CREATED', body);
-        await outbox('CATEGORY', category.id);
         return serializeCategory(category, 0);
       }),
 
@@ -948,7 +947,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         }
         await update('categories', id, { ...body, updatedAt: now().toISOString() });
         await audit('CATEGORY', id, 'UPDATED', body);
-        await outbox('CATEGORY', id);
         const c = (await categoryById(id))!;
         const usage = await db.all<{ n: number }>(
           `SELECT COUNT(*) AS n FROM ${c.type === 'BILL' ? 'bills' : 'events'} WHERE category_id = ?`,
@@ -962,7 +960,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         if (!(await categoryById(id))) throw notFound('Category');
         await run('DELETE FROM categories WHERE id = ?', [id]); // bills/events become uncategorised (ON DELETE SET NULL)
         await audit('CATEGORY', id, 'DELETED');
-        await outbox('CATEGORY', id, 'delete');
       }),
 
     // ── bills ──
@@ -1032,7 +1029,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         await insert('bills', bill);
         await generateForNewBill(bill, s);
         await audit('BILL', bill.id, 'CREATED', body);
-        await outbox('BILL', bill.id);
         return serializeBill(await loadBill(bill.id), await categoryById(bill.categoryId));
       }),
 
@@ -1056,7 +1052,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
           );
         }
         await audit('BILL', id, 'UPDATED', changes);
-        await outbox('BILL', id);
         return serializeBill(updated, await categoryById(updated.categoryId));
       }),
 
@@ -1067,7 +1062,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const bill = await loadBill(id);
         if (bill.recurrenceFrequency) await regenerateBill(bill, await getSettingsModel());
         await audit('BILL', id, archived ? 'ARCHIVED' : 'UNARCHIVED');
-        await outbox('BILL', id);
       }),
 
     deleteBill: (id) =>
@@ -1076,7 +1070,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const count = await db.all<{ n: number }>('SELECT COUNT(*) AS n FROM bill_occurrences WHERE bill_id = ?', [id]);
         await run('DELETE FROM bills WHERE id = ?', [id]);
         await audit('BILL', id, 'DELETED', { name: bill.name, amount: bill.amount, occurrencesDeleted: Number(count[0]?.n ?? 0) });
-        await outbox('BILL', id, 'delete');
       }),
 
     // ── bill occurrences ──
@@ -1252,7 +1245,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         await insert('events', event);
         await generateForNewEvent(event, s);
         await audit('EVENT', event.id, 'CREATED', body);
-        await outbox('EVENT', event.id);
         return serializeEvent(await loadEvent(event.id), await categoryById(event.categoryId));
       }),
 
@@ -1268,7 +1260,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const updated = await loadEvent(id);
         if (EVENT_SCHEDULE_FIELDS.some((f) => f in changes)) await regenerateEvent(updated, s);
         await audit('EVENT', id, 'UPDATED', changes);
-        await outbox('EVENT', id);
         return serializeEvent(updated, await categoryById(updated.categoryId));
       }),
 
@@ -1279,7 +1270,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const event = await loadEvent(id);
         if (event.recurrenceFrequency) await regenerateEvent(event, await getSettingsModel());
         await audit('EVENT', id, archived ? 'ARCHIVED' : 'UNARCHIVED');
-        await outbox('EVENT', id);
       }),
 
     deleteEvent: (id) =>
@@ -1288,7 +1278,6 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const count = await db.all<{ n: number }>('SELECT COUNT(*) AS n FROM event_occurrences WHERE event_id = ?', [id]);
         await run('DELETE FROM events WHERE id = ?', [id]);
         await audit('EVENT', id, 'DELETED', { title: event.title, occurrencesDeleted: Number(count[0]?.n ?? 0) });
-        await outbox('EVENT', id, 'delete');
       }),
 
     // ── event occurrences ──
@@ -1557,6 +1546,13 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     // ── local-only ──
     runMaintenance: () => op(maintenance, false),
     createBackup: () => op(createBackup, false),
+    subscribeChanges: (fn) => {
+      changeListeners.add(fn);
+      return () => void changeListeners.delete(fn);
+    },
+    sync: Object.fromEntries(
+      Object.entries(createSyncStore(db, run)).map(([name, fn]) => [name, (...args: unknown[]) => op(() => (fn as (...a: unknown[]) => Promise<unknown>)(...args), false)]),
+    ) as SyncStore,
     restoreBackup: (backup) => op(() => restoreBackup(backup), false),
     getUpcomingReminders: ({ limit = 100, days = 60 } = {}) => op(() => upcomingReminders(Math.max(1, Math.min(limit, 500)), days)),
     close: async () => {

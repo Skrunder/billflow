@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Server sync. Plain http:// is allowed here because self-hosted servers often
+  run without TLS on the home network; the app itself only accepts http:// for
+  private addresses (src/sync/url.ts) and warns about it. Certificates the
+  user installed are trusted too, for home servers with their own CA.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

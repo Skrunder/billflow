@@ -65,11 +65,20 @@ describe('native SQLite driver', () => {
     ]);
   });
 
+  it('keeps trigger bodies whole', () => {
+    expect(splitStatements('CREATE TABLE t (x);\nCREATE TRIGGER tr AFTER INSERT ON t BEGIN INSERT INTO u VALUES (1); INSERT INTO u VALUES (2); END;\nDROP TABLE t;')).toEqual([
+      'CREATE TABLE t (x)',
+      'CREATE TRIGGER tr AFTER INSERT ON t BEGIN INSERT INTO u VALUES (1); INSERT INTO u VALUES (2); END',
+      'DROP TABLE t',
+    ]);
+  });
+
   it('runs the engine: migrations, writes and rollback of failed calls', async () => {
     const { conn, calls } = await fakeConnection();
     const repo = await createLocalRepository(createNativeSqliteDriver(conn), { timezone: 'America/Chicago' });
     expect(calls.length).toBeGreaterThan(10);
-    expect(calls.every((c) => !c.includes(';') && !c.includes('--'))).toBe(true);
+    expect(calls.filter((c) => !c.startsWith('CREATE TRIGGER')).every((c) => !c.includes(';') && !c.includes('--'))).toBe(true);
+    expect(calls.filter((c) => c.startsWith('CREATE TRIGGER')).every((c) => c.endsWith('END'))).toBe(true);
 
     const b = await repo.createBill({
       name: 'Rent', description: null, notes: null, amount: '1500', categoryId: null, paymentMethod: 'MANUAL',

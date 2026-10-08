@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: cloud backup and device-to-device transfer keep the app's data, but never the server sign-in. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="sync-auth.json" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="sync-auth.json" />
+    </device-transfer>
+</data-extraction-rules>

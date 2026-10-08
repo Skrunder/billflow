@@ -14,8 +14,9 @@ import type { SqlDriver } from './driver';
  * row with its own status and audit history, exactly like the server.
  *
  * Migrations are append-only: never edit a released step, add a new one.
- * On Android each script is split into statements on `;` (native-driver.ts),
- * so scripts must not contain triggers or string literals with `;` or `--`.
+ * On Android each script is split into statements on `;` (native-driver.ts;
+ * CREATE TRIGGER … END is kept whole), so scripts must not contain string
+ * literals with `;` or `--`.
  */
 export const MIGRATIONS: string[] = [
   // 1 — initial schema
@@ -198,6 +199,51 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE event_occurrences ADD COLUMN status_changed_at TEXT;
   UPDATE bill_occurrences SET status_changed_at = COALESCE(completed_at, updated_at) WHERE status <> 'PENDING';
   UPDATE event_occurrences SET status_changed_at = COALESCE(completed_at, cancelled_at, updated_at) WHERE status <> 'UPCOMING';
+  `,
+
+  // 3 — server sync (M6). While connected to a server ('deviceId' in
+  // sync_state), triggers record every local change in the outbox, except
+  // while changes from the server are being applied ('applying'). A phone
+  // that never connects queues nothing; connecting queues everything once. sync_base remembers the server's updatedAt for each row, so
+  // the server can tell a real conflict from a plain update.
+  `
+  DELETE FROM outbox;
+  CREATE TABLE sync_base (entity TEXT NOT NULL, id TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (entity, id));
+  CREATE INDEX outbox_entity ON outbox (entity_type, entity_id);
+  CREATE TRIGGER categories_sync_insert AFTER INSERT ON categories WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('categories', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER categories_sync_update AFTER UPDATE ON categories WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('categories', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER categories_sync_delete AFTER DELETE ON categories WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('categories', OLD.id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bills_sync_insert AFTER INSERT ON bills WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('bills', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bills_sync_update AFTER UPDATE ON bills WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('bills', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bills_sync_delete AFTER DELETE ON bills WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('bills', OLD.id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER events_sync_insert AFTER INSERT ON events WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('events', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER events_sync_update AFTER UPDATE ON events WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('events', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER events_sync_delete AFTER DELETE ON events WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('events', OLD.id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bill_occurrences_sync_insert AFTER INSERT ON bill_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('billOccurrences', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bill_occurrences_sync_update AFTER UPDATE ON bill_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('billOccurrences', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER bill_occurrences_sync_delete AFTER DELETE ON bill_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('billOccurrences', OLD.id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER event_occurrences_sync_insert AFTER INSERT ON event_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('eventOccurrences', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER event_occurrences_sync_update AFTER UPDATE ON event_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('eventOccurrences', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER event_occurrences_sync_delete AFTER DELETE ON event_occurrences WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('eventOccurrences', OLD.id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER audit_logs_sync_insert AFTER INSERT ON audit_logs WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('auditLogs', NEW.id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
+  CREATE TRIGGER settings_sync_update AFTER UPDATE ON settings WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
+  BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('settings', 'settings', 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
   `,
 ];
 

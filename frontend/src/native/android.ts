@@ -2,12 +2,12 @@ import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 import { App } from '@capacitor/app';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { CapacitorHttp, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
 import { createLocalRepository, type LocalRepository, type UpcomingReminder } from '../data/local/engine';
 import { createNativeSqliteDriver } from '../data/local/native-driver';
 import { queryClient } from '../queryClient';
-import { navigateTo, setPhoneReminders, setSaveFile } from './device';
+import { navigateTo, setPhoneReminders, setSaveFile, setSyncAdapters } from './device';
 
 /**
  * Android app startup: opens the on-device SQLite database and wires up the
@@ -94,6 +94,41 @@ export async function openNativeRepository(): Promise<LocalRepository> {
     }
   });
 
+  // Server sync: native HTTP (no CORS or mixed-content limits for a plain-http
+  // home server) and the refresh token in a private file that Android's cloud
+  // backup excludes (res/xml/backup_rules.xml, data_extraction_rules.xml).
+  const TOKEN_FILE = { path: 'sync-auth.json', directory: Directory.Data };
+  setSyncAdapters({
+    deviceName: phoneName(),
+    async http({ method, url, token, body, timeoutMs = 30_000 }) {
+      const res = await CapacitorHttp.request({
+        url,
+        method,
+        headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        data: body,
+        connectTimeout: 15_000,
+        readTimeout: timeoutMs,
+        responseType: 'json',
+      });
+      return { status: res.status, data: res.data as unknown };
+    },
+    secrets: {
+      async load() {
+        try {
+          return (JSON.parse(String((await Filesystem.readFile({ ...TOKEN_FILE, encoding: Encoding.UTF8 })).data)) as { refreshToken?: string }).refreshToken ?? null;
+        } catch {
+          return null;
+        }
+      },
+      async save(refreshToken) {
+        await Filesystem.writeFile({ ...TOKEN_FILE, data: JSON.stringify({ refreshToken }), encoding: Encoding.UTF8 });
+      },
+      async clear() {
+        await Filesystem.deleteFile(TOKEN_FILE).catch(() => undefined);
+      },
+    },
+  });
+
   // Tapping a reminder opens the bill or event it is about.
   await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
     const url = (action.notification.extra as { url?: unknown } | undefined)?.url;
@@ -115,6 +150,12 @@ export async function openNativeRepository(): Promise<LocalRepository> {
   followThemeWithStatusBar();
   scheduler.soon();
   return repo;
+}
+
+/** "Pixel 8" from the WebView's user agent, for the server's list of signed-in phones. */
+function phoneName(): string {
+  const model = navigator.userAgent.match(/Android [\d.]+; ([^;)]+)/)?.[1]?.replace(/\s+Build\/.*$/, '').trim();
+  return model && model !== 'K' ? model.slice(0, 60) : 'Android phone';
 }
 
 /** FNV-1a: a stable 31-bit notification id for each occurrence + offset (never the test id). */

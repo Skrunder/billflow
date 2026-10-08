@@ -36,3 +36,17 @@ export const deleteAccount = (password: string) => api('/users/me', { method: 'D
 
 /** Sends a test reminder on every channel enabled for the account. */
 export const sendTestNotification = () => api<Record<string, string>>('/notifications/test', { method: 'POST' });
+
+/** Phones signed in to this account with the Android app (server sync). */
+export interface SignedInPhone {
+  id: string;
+  name: string;
+  platform: string;
+  lastSyncAt: string | null;
+  createdAt: string;
+}
+
+export const listPhones = () => api<SignedInPhone[]>('/sync/devices');
+
+/** Signs a phone out: it stops syncing until someone signs in on it again. Its own data stays on it. */
+export const signOutPhone = (id: string) => api(`/sync/devices/${id}`, { method: 'DELETE' });

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older: Google backup keeps the app's data, but never the server sign-in. -->
+<full-backup-content>
+    <exclude domain="file" path="sync-auth.json" />
+</full-backup-content>

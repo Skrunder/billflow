@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** M1–M5 done. The standalone Android app (1.1.0) builds, installs and runs with no server (`ANDROID.md`); the server now has sync and native sign-in (`API.md`, "Sync"). Next: M6, sync in the app.
+**Status:** M1–M6 done. The Android app (1.2.0) works fully standalone and can optionally sync with your server (`ANDROID.md`, "Connecting to your server"). Next: M7, release automation (CI-built APK).
 
 ---
 
@@ -85,7 +85,7 @@
 * Web app keeps working exactly as before, and edits made on the web are picked up by phones.
 * Integration tests: two simulated devices plus web edits, covering conflicts, deletes and offline catch-up.
 
-### M6 · Sync in the app
+### M6 · Sync in the app ✅ done
 * Settings → **Connect to server** (URL, login, first-merge preview), **Disconnect**, and **Sync now**.
 * Background sync (on app open, on reconnect, periodically while open), with a status indicator ("Synced 2 min ago" / "3 changes waiting").
 * Conflict handling as described above. Sync errors are shown clearly and never block local use.

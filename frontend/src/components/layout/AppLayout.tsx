@@ -17,6 +17,8 @@ import { useUnreadCount } from '../../api/hooks';
 import { useRepository } from '../../data/RepositoryProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { useOnline, useSettings, useThemeSync } from '../../hooks/useSettings';
+import { describeSync, SyncIndicator } from '../sync/SyncIndicator';
+import { useSyncStatus } from '../../sync/context';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -73,6 +75,7 @@ export function AppLayout() {
   const settings = useSettings();
   const online = useOnline();
   const standalone = useRepository().kind === 'local';
+  const sync = useSyncStatus();
   // The on-device database never depends on the network.
   const offline = !standalone && (status === 'offline' || !online);
   const { data: unread } = useUnreadCount(!offline);
@@ -117,7 +120,9 @@ export function AppLayout() {
         <div className="border-t border-slate-200 p-3 dark:border-slate-800">
           <div className="truncate px-3 text-sm font-medium">{user?.displayName}</div>
           {standalone ? (
-            <div className="px-3 text-xs text-slate-500">Data stored on this device</div>
+            <div className="px-3 text-xs text-slate-500">
+              {sync && sync.phase !== 'disconnected' ? describeSync(sync).text : 'Data stored on this device'}
+            </div>
           ) : (
             <>
               <div className="truncate px-3 text-xs text-slate-500">{user?.email}</div>
@@ -137,6 +142,7 @@ export function AppLayout() {
           </Link>
           <div className="hidden md:block" />
           <div className="flex items-center gap-1.5">
+            <SyncIndicator />
             <Link to="/notifications" className="icon-btn relative" aria-label={`Notifications${unread?.count ? `, ${unread.count} unread` : ''}`}>
               <Bell className="h-5 w-5" aria-hidden />
               {Boolean(unread?.count) && (

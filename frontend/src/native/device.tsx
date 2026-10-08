@@ -49,6 +49,17 @@ let saveFileImpl: SaveFile = async (name, text, mimeType) => {
 export const setSaveFile = (impl: SaveFile) => void (saveFileImpl = impl);
 export const saveFile: SaveFile = (...args) => saveFileImpl(...args);
 
+// ── server sync (Android: native HTTP and token storage) ──
+
+export interface SyncAdapters {
+  http: import('../sync/client').HttpTransport;
+  secrets: import('../sync/client').SecretStore;
+  deviceName: string;
+}
+let syncAdapters: SyncAdapters | null = null;
+export const setSyncAdapters = (a: SyncAdapters) => void (syncAdapters = a);
+export const getSyncAdapters = () => syncAdapters;
+
 // ── navigation from outside React (notification taps, back button) ──
 
 let navigate: ((to: string | number) => void) | null = null;
