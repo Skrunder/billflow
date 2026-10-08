@@ -75,7 +75,7 @@ describe('first start', () => {
   });
 
   it('implements every DataRepository method', () => {
-    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'close'].includes(k)).sort();
+    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'getUpcomingReminders', 'close'].includes(k)).sort();
     expect(local).toEqual(Object.keys(createRemoteRepository()).sort());
     expect(repo.kind).toBe('local');
   });
@@ -245,6 +245,40 @@ describe('background maintenance', () => {
     expect(await repo.getUnreadNotificationCount()).toBe(1);
     await repo.markAllNotificationsRead();
     expect(await repo.getUnreadNotificationCount()).toBe(0);
+  });
+});
+
+describe('phone reminders', () => {
+  it('lists future reminders soonest first, with text for the moment they fire', async () => {
+    const b = await repo.createBill(bill({ name: 'Car Insurance', amount: '80', startDate: '2026-10-09', dueTime: '12:00', recurrence: null, reminderOffsets: [10080, 1440, 60] }));
+    await repo.createEvent(event({ title: 'Dentist', startDate: '2026-10-08', startTime: '09:00', endTime: '10:00', recurrence: null, reminderOffsets: [60] }));
+    const [occ] = await repo.listBillOccurrences({ billId: b.id });
+
+    const upcoming = await repo.getUpcomingReminders();
+    // The 7-day reminder (Oct 2) is already past, so it is never scheduled.
+    expect(upcoming.map((r) => [r.at, r.title])).toEqual([
+      ['2026-10-08T13:00:00.000Z', 'Dentist in 1 hour'],
+      ['2026-10-08T17:00:00.000Z', 'Car Insurance is due tomorrow'],
+      ['2026-10-09T16:00:00.000Z', 'Car Insurance is due in 1 hour'],
+    ]);
+    expect(upcoming[1]).toMatchObject({ key: `${occ!.id}:1440`, body: '$80.00 due Fri, Oct 9 at 12:00 PM', url: `/bills/${b.id}?occurrence=${occ!.id}` });
+    expect(await repo.getUpcomingReminders({ limit: 1 })).toHaveLength(1);
+
+    // Paying the bill early cancels its reminders; nothing else changes.
+    await repo.completeBillOccurrence(occ!.id, {});
+    expect((await repo.getUpcomingReminders()).map((r) => r.title)).toEqual(['Dentist in 1 hour']);
+  });
+
+  it('reports committed changes only', async () => {
+    let changes = 0;
+    repo = await createLocalRepository(createSqlJsDriver(SQL), { clock: () => clock, timezone: 'America/Chicago', onChange: () => changes++ });
+    await repo.getProfile();
+    await repo.listBills();
+    expect(changes).toBe(0);
+    await repo.createBill(bill());
+    expect(changes).toBe(1);
+    await expect(repo.createBill(bill({ amount: '-5' }))).rejects.toBeInstanceOf(ApiError);
+    expect(changes).toBe(1);
   });
 });
 

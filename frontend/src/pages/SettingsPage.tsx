@@ -15,6 +15,7 @@ import { useToast } from '../components/ui/Toast';
 import { useCanEdit } from '../hooks/useCanEdit';
 import { applyTheme } from '../hooks/useSettings';
 import { currentSubscription, pushSupported, subscribeToPush, unsubscribeFromPush } from '../lib/push';
+import { getPhoneReminders, type PhoneReminderStatus } from '../native/device';
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -159,7 +160,10 @@ export function SettingsPage() {
 
         {standalone ? (
           <Section title="Notifications" description="Reminders that are due appear under the bell icon.">
-            <Toggle label="In-app notifications" checked={s.inAppNotifications} onChange={(v) => save({ inAppNotifications: v })} />
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <Toggle label="In-app notifications" checked={s.inAppNotifications} onChange={(v) => save({ inAppNotifications: v })} />
+              {getPhoneReminders() && <PhoneReminderSettings enabled={s.pushNotifications} onSave={save} />}
+            </div>
           </Section>
         ) : (
           <NotificationSection settings={s} pushServer={Boolean(config?.pushEnabled)} emailServer={Boolean(config?.emailNotificationsEnabled)} onSave={save} />
@@ -273,6 +277,65 @@ function NotificationSection({ settings: s, pushServer, emailServer, onSave }: {
         <p className="hint mt-2">This browser can&apos;t receive push notifications. On iPhone/iPad, add the app to your Home Screen (Share → Add to Home Screen) and open it from there.</p>
       )}
     </Section>
+  );
+}
+
+/** Android app: reminders as system notifications (stored in the pushNotifications setting). */
+function PhoneReminderSettings({ enabled, onSave }: { enabled: boolean; onSave: (p: Partial<Settings>, m?: string) => void }) {
+  const phone = getPhoneReminders()!;
+  const toast = useToast();
+  const [status, setStatus] = useState<PhoneReminderStatus | null>(null);
+  const refresh = () => void phone.status().then(setStatus, () => setStatus(null));
+
+  useEffect(() => {
+    refresh();
+    // Permissions can change in Android's settings while the app is in the background.
+    addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+
+  const toggle = async (on: boolean) => {
+    if (!on) return onSave({ pushNotifications: false }, 'Phone notifications off');
+    if (await phone.requestPermission()) onSave({ pushNotifications: true }, 'Phone notifications on');
+    else toast.error('Notifications are blocked. Allow them for Bill Calendar in Android settings.');
+    refresh();
+  };
+
+  const blocked = status?.permission === 'denied';
+  return (
+    <div className="py-2">
+      <Toggle
+        label="Phone notifications"
+        description={
+          blocked
+            ? 'Blocked in Android settings (Apps → Bill Calendar → Notifications).'
+            : 'Reminders pop up on this phone at their reminder time, even when the app is closed.'
+        }
+        checked={enabled && status?.permission === 'granted'}
+        onChange={(v) => void toggle(v)}
+      />
+      {enabled && status?.permission === 'granted' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {!status.exact && (
+            <button type="button" className="btn-secondary" onClick={() => void phone.openExactAlarmSettings().finally(refresh)}>
+              Allow exact timing
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void phone.sendTest().then(() => toast.success('Test notification on its way'), (e) => toast.error(errorMessage(e)))}
+          >
+            <Send className="h-4 w-4" aria-hidden /> Send test notification
+          </button>
+          {!status.exact && <p className="hint w-full">Without exact timing Android may deliver reminders a few minutes late.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

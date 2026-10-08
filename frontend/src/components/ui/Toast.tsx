@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6 md:items-end"
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+var(--inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6 md:items-end"
       >
         {toasts.map((t) => {
           const Icon = t.kind === 'success' ? CheckCircle2 : t.kind === 'error' ? XCircle : Info;

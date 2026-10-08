@@ -7,12 +7,14 @@ import { App } from './App';
 import { AuthProvider, LocalAuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { RepositoryProvider } from './data/RepositoryProvider';
+import { DeviceNavigator, isNativeApp } from './native/device';
 import type { DataRepository } from './data/repository';
 import './index.css';
 import { CACHE_MAX_AGE, persister, queryClient } from './queryClient';
 
 // Service worker: offline app shell + push notifications. Updates apply automatically.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Not in the Android app, which ships its files inside the APK.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   registerSW({ immediate: true });
 }
 
@@ -27,6 +29,7 @@ function Shell({ children }: { children: ReactNode }) {
     <StrictMode>
       <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: CACHE_MAX_AGE, buster: __APP_VERSION__ }}>
         <BrowserRouter>
+          <DeviceNavigator />
           <ToastProvider>{children}</ToastProvider>
         </BrowserRouter>
       </PersistQueryClientProvider>
@@ -50,8 +53,8 @@ async function bootstrap() {
   }
 
   try {
-    const { openBrowserLocalRepository } = await import('./data/local/browser');
-    const repository: DataRepository = await openBrowserLocalRepository();
+    const { openDeviceRepository } = await import('./data/local/browser');
+    const repository: DataRepository = await openDeviceRepository();
     const { user } = await repository.getProfile();
     root.render(
       <Shell>

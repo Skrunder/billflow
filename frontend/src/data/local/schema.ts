@@ -14,6 +14,8 @@ import type { SqlDriver } from './driver';
  * row with its own status and audit history, exactly like the server.
  *
  * Migrations are append-only: never edit a released step, add a new one.
+ * On Android each script is split into statements on `;` (native-driver.ts),
+ * so scripts must not contain triggers or string literals with `;` or `--`.
  */
 const MIGRATIONS: string[] = [
   // 1 — initial schema

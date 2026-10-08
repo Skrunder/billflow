@@ -5,6 +5,10 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Screen insets (notch, status and gesture bars). The Android app injects
+       --safe-area-inset-* because its WebView can't always report env(). */
+    --inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
   :focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900;

@@ -2,11 +2,20 @@ import initSqlJs from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { createLocalRepository, type LocalRepository } from './engine';
 import { createSqlJsDriver, loadSnapshot, saveSnapshot } from './sqljs-driver';
+import { isNativeApp } from '../../native/device';
+
+/** Opens the standalone engine: native SQLite inside the Android app, sql.js in a browser. */
+export async function openDeviceRepository(): Promise<LocalRepository> {
+  if (isNativeApp()) {
+    const { openNativeRepository } = await import('../../native/android');
+    return openNativeRepository();
+  }
+  return openBrowserLocalRepository();
+}
 
 /**
  * Opens the standalone engine inside a normal browser (development and the
- * "standalone" web build). The SQLite database is kept in IndexedDB; the
- * Android app replaces this with native SQLite in milestone 4.
+ * "standalone" web build). The SQLite database is kept in IndexedDB.
  */
 export async function openBrowserLocalRepository(): Promise<LocalRepository> {
   const SQL = await initSqlJs({ locateFile: () => wasmUrl });

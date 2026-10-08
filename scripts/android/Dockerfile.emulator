@@ -1,0 +1,12 @@
+# Headless Android emulator for testing the APK (needs /dev/kvm).
+# Test-only; see docs/ANDROID.md. Builds on the APK build image.
+FROM skr-android-builder:1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpulse0 libnss3 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libxrandr2 \
+      libasound2t64 libgl1 libegl1 libxkbfile1 libdbus-1-3 libtcmalloc-minimal4t64 \
+ && rm -rf /var/lib/apt/lists/* \
+ && sdkmanager --install "emulator" "system-images;android-36;google_apis;x86_64" >/dev/null \
+ && chmod -R a+rX $ANDROID_HOME
+
+ENV PATH=$ANDROID_HOME/emulator:$PATH

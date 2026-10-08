@@ -91,11 +91,25 @@ export interface LocalRepositoryOptions {
   timezone?: string;
   locale?: string;
   displayName?: string;
+  /** Called after any call that changed data has committed (e.g. to reschedule phone reminders). */
+  onChange?: () => void;
+}
+
+/** A reminder that will become due later; the Android app schedules these as system notifications. */
+export interface UpcomingReminder {
+  /** Stable per occurrence and offset: `${occurrenceId}:${offsetMinutes}`. */
+  key: string;
+  at: string;
+  title: string;
+  body: string;
+  url: string;
 }
 
 export type LocalRepository = DataRepository & {
   /** Auto-pay, horizon extension and due reminders. Runs automatically about once a minute. */
   runMaintenance(): Promise<void>;
+  /** The next reminders after "now", soonest first (pending bills and upcoming events only). */
+  getUpcomingReminders(options?: { limit?: number; days?: number }): Promise<UpcomingReminder[]>;
   close(): Promise<void>;
 };
 
@@ -148,7 +162,11 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
 
   const all = <T>(sql: string, params: SqlValue[] = []) => db.all(sql, params).then((rows) => rows.map((r) => fromRow<T>(r)));
   const one = async <T>(sql: string, params: SqlValue[] = []) => (await all<T>(sql, params))[0] ?? null;
-  const run = (sql: string, params: SqlValue[] = []) => db.run(sql, params);
+  let changed = false;
+  const run = (sql: string, params: SqlValue[] = []) => {
+    changed = true;
+    return db.run(sql, params);
+  };
 
   async function insert(table: string, model: object) {
     const entries = Object.entries(model);
@@ -189,11 +207,13 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
   function op<T>(fn: () => Promise<T>, maintain = true): Promise<T> {
     const result = queue.then(async () => {
       await db.exec('BEGIN');
+      changed = false;
       try {
         if (maintain && now().getTime() - lastMaintenance >= MAINTENANCE_INTERVAL_MS) await maintenance();
         const value = await fn();
         await db.exec('COMMIT');
         db.afterWrite?.();
+        if (changed) options.onChange?.();
         return value;
       } catch (err) {
         await db.exec('ROLLBACK');
@@ -528,6 +548,8 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
   }
 
   /** In-app inbox: records reminders that have become due (same rules as the server). */
+  // Inbox rows use db.run, not run(): they don't change what the phone schedules,
+  // so they shouldn't count as a change for onChange.
   async function planReminders(s: SettingsModel) {
     if (!s.inAppNotifications) return;
     const n = now();
@@ -552,7 +574,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
           n,
           locale,
         );
-        await run(
+        await db.run(
           `INSERT INTO notifications (id, bill_occurrence_id, offset_minutes, scheduled_for, status, title, body, url, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
           [randomUuid(), String(r.id), offset, reminderTime(at, offset).toISOString(), offset === deliver ? 'SENT' : 'CANCELLED', text.title, text.body, `/bills/${r.bill_id}?occurrence=${r.id}`, stamp],
@@ -576,13 +598,58 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
           n,
           locale,
         );
-        await run(
+        await db.run(
           `INSERT INTO notifications (id, event_occurrence_id, offset_minutes, scheduled_for, status, title, body, url, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
           [randomUuid(), String(r.id), offset, reminderTime(at, offset).toISOString(), offset === deliver ? 'SENT' : 'CANCELLED', text.title, text.body, `/events/${r.event_id}?occurrence=${r.id}`, stamp],
         );
       }
     }
+  }
+
+  async function upcomingReminders(limit: number, days: number): Promise<UpcomingReminder[]> {
+    const s = await getSettingsModel();
+    const n = now();
+    const from = n.toISOString();
+    const until = new Date(n.getTime() + days * 86_400_000).toISOString();
+    // Occurrences up to MAX_REMINDER_MINUTES past the window can still have a reminder inside it.
+    const occUntil = new Date(n.getTime() + days * 86_400_000 + MAX_REMINDER_MINUTES * 60_000).toISOString();
+    const locale = { timezone: s.timezone, locale: s.locale, currency: s.currency, timeFormat: s.timeFormat };
+    const out: UpcomingReminder[] = [];
+    const add = (occurrenceId: string, at: Date, offsets: number[], text: (offset: number, sendAt: Date) => { title: string; body: string }, url: string) => {
+      for (const offset of offsets) {
+        const sendAt = reminderTime(at, offset);
+        const iso = sendAt.toISOString();
+        if (iso <= from || iso > until) continue;
+        out.push({ key: `${occurrenceId}:${offset}`, at: iso, ...text(offset, sendAt), url });
+      }
+    };
+
+    const bills = await db.all<SqlRow>(
+      `SELECT o.id, o.bill_id, o.due_at, o.due_time, o.amount, b.name, b.payment_method, b.reminder_offsets
+       FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
+       WHERE o.status = 'PENDING' AND o.due_at > ? AND o.due_at <= ? AND b.reminder_offsets <> '[]'`,
+      [from, occUntil],
+    );
+    for (const r of bills) {
+      const at = new Date(String(r.due_at));
+      const bill = { name: String(r.name), amount: String(r.amount), dueAt: at, allDay: !r.due_time, paymentMethod: r.payment_method as BillModel['paymentMethod'] };
+      add(String(r.id), at, JSON.parse(String(r.reminder_offsets)) as number[], (offset, sendAt) => billReminderText(bill, offset, sendAt, locale), `/bills/${r.bill_id}?occurrence=${r.id}`);
+    }
+
+    const events = await db.all<SqlRow>(
+      `SELECT o.id, o.event_id, o.start_at, o.start_time, e.title, e.location, e.reminder_offsets
+       FROM event_occurrences o JOIN events e ON e.id = o.event_id
+       WHERE o.status = 'UPCOMING' AND o.start_at > ? AND o.start_at <= ? AND e.reminder_offsets <> '[]'`,
+      [from, occUntil],
+    );
+    for (const r of events) {
+      const at = new Date(String(r.start_at));
+      const event = { title: String(r.title), startAt: at, allDay: !r.start_time, location: (r.location as string | null) ?? null };
+      add(String(r.id), at, JSON.parse(String(r.reminder_offsets)) as number[], (offset, sendAt) => eventReminderText(event, offset, sendAt, locale), `/events/${r.event_id}?occurrence=${r.id}`);
+    }
+
+    return out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.key < b.key ? -1 : 1)).slice(0, limit);
   }
 
   async function maintenance() {
@@ -1419,6 +1486,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
 
     // ── local-only ──
     runMaintenance: () => op(maintenance, false),
+    getUpcomingReminders: ({ limit = 100, days = 60 } = {}) => op(() => upcomingReminders(Math.max(1, Math.min(limit, 500)), days)),
     close: async () => {
       await queue;
       await db.close();
