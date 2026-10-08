@@ -12,7 +12,7 @@ function AuthCard({ title, subtitle, children, footer }: { title: string; subtit
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src="/icons/icon-192.png" alt="" className="mb-3 h-14 w-14 rounded-2xl shadow-sm" />
+          <img src="/icons/billflow-192.png" alt="" className="mb-3 h-14 w-14 rounded-2xl shadow-sm" />
           <h1 className="text-xl font-semibold">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
         </div>

@@ -2,6 +2,9 @@
 
 BillFlow follows semantic versioning (see [docs/UPGRADING.md](docs/UPGRADING.md)). Every release updates the server, the web app and the Android app together.
 
+## 1.5.1 (2026-10-08)
+* Fixed: the web app (Docker) could keep showing the old icon. The icon files have new names, so browsers fetch the new artwork instead of reusing cached copies. An installed PWA may still need reinstalling to change its home-screen icon.
+
 ## 1.5.0: BillFlow (2026-10-08)
 * **New name and icon.** SKR's Bill Calendar is now **BillFlow**: titles, emails, notifications, the Android app name and the APK file (`billflow-<version>.apk`). The new icon (a bill with a flowing wave) covers the web app, the installable PWA, the Android launcher (including Android 13+ themed icons) and the notification icon.
 * Backup and export downloads are named `billflow-backup-…` / `billflow-export-…`. Older backups still restore.

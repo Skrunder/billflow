@@ -143,6 +143,7 @@ docker exec skr-emu sh -c 'adb forward tcp:9222 localabstract:webview_devtools_r
 emulator-only glitch: with software rendering the dashboard heading sometimes isn't painted on
 screen even though the WebView renders it (visible in a DevTools screenshot).
 
+Checked for 1.5.1: renamed web icon files load (header logo), release upgrade over 1.5.0.
 Checked for 1.5.0 (BillFlow): launcher name and icon, in-app header, release upgrade over 1.4.0.
 Checked for 1.4.0: estimated amounts (create, ✓ opens the payment form with the estimate selected,
 actual amount shown after paying), upgrade from 1.3.1 with data (debug and release).

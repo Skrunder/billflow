@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => ({
       filename: 'sw.ts',
       registerType: 'autoUpdate',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'theme-init.js', 'icons/apple-touch-icon.png'],
+      includeAssets: ['billflow.svg', 'theme-init.js', 'icons/billflow-apple-touch.png'],
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,wasm}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
@@ -42,13 +42,13 @@ export default defineConfig(({ mode }) => ({
         theme_color: '#4f46e5',
         categories: ['finance', 'productivity'],
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/billflow-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/billflow-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/billflow-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
         shortcuts: [
-          { name: 'Add bill', url: '/bills/new', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Calendar', url: '/calendar', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Add bill', url: '/bills/new', icons: [{ src: '/icons/billflow-192.png', sizes: '192x192' }] },
+          { name: 'Calendar', url: '/calendar', icons: [{ src: '/icons/billflow-192.png', sizes: '192x192' }] },
         ],
       },
       devOptions: { enabled: false },

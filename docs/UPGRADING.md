@@ -43,6 +43,9 @@ Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen
 
 ## Notes for specific versions
 
+### 1.5.1
+The web icon files have new names so browsers stop showing the cached old icon. Reload the page once after updating; an installed PWA's home-screen icon may still need a reinstall.
+
 ### 1.5.0: renamed to BillFlow
 A name and icon change only; data, volumes and settings are untouched.
 * **Email sender:** if your `.env` sets `SMTP_FROM` explicitly, change the display name there yourself (the default is now `BillFlow <no-reply@…>`).

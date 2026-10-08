@@ -4,8 +4,10 @@ on an indigo-to-cyan gradient. One artwork for the web app and the Android app.
 
 Pure Python, no dependencies. Run from the repo root after changing the design:
     python3 scripts/icons.py
-Writes frontend/public/favicon.svg, frontend/public/icons/*.png and
+Writes frontend/public/billflow.svg, frontend/public/icons/*.png and
 frontend/android/app/src/main/res/mipmap-*/ic_launcher*.png.
+Rename the web files when the artwork changes: browsers keep icons cached
+under their old URLs (favicon cache, installed PWAs) and ignore new content.
 """
 import math, os, struct, zlib
 
@@ -173,15 +175,15 @@ def svg():
 
 
 if __name__ == '__main__':
-    with open(os.path.join(WEB, 'favicon.svg'), 'w') as f:
+    with open(os.path.join(WEB, 'billflow.svg'), 'w') as f:
         f.write(svg())
-    print('wrote frontend/public/favicon.svg')
+    print('wrote frontend/public/billflow.svg')
     icons = os.path.join(WEB, 'icons')
-    render(os.path.join(icons, 'icon-192.png'), 192, full_icon('square'))
-    render(os.path.join(icons, 'icon-512.png'), 512, full_icon('square'))
+    render(os.path.join(icons, 'billflow-192.png'), 192, full_icon('square'))
+    render(os.path.join(icons, 'billflow-512.png'), 512, full_icon('square'))
     # Maskable: full bleed, artwork inside the 80% safe zone.
-    render(os.path.join(icons, 'icon-maskable-512.png'), 512, full_icon(None, 0.8))
-    render(os.path.join(icons, 'apple-touch-icon.png'), 180, full_icon(None, 0.86))
+    render(os.path.join(icons, 'billflow-maskable-512.png'), 512, full_icon(None, 0.8))
+    render(os.path.join(icons, 'billflow-apple-touch.png'), 180, full_icon(None, 0.86))
 
     for density, (icon, layer) in DENSITIES.items():
         d = os.path.join(RES, f'mipmap-{density}')
