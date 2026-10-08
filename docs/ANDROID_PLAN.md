@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** M1 (shared core), M2 (data layer) and M3 (local engine) done. Next: M4, the first APK.
+**Status:** M1–M4 done: the standalone Android app (1.1.0) builds, installs and runs with no server. See `ANDROID.md` for building and installing. Next: M5, server sync support.
 
 ---
 
@@ -71,7 +71,7 @@
 * `LocalRepository` implements everything locally: occurrence generation and horizon extension, per-occurrence complete/skip/reopen/edit with audit history, dashboard and calendar queries, categories with defaults, settings, auto-pay.
 * Tests: the same independence and integrity tests as the server suite, run against the local engine.
 
-### M4 · First APK: fully standalone ✅ usable milestone
+### M4 · First APK: fully standalone ✅ done
 * Capacitor Android project, app icon/splash, status bar and back-button handling.
 * Native reminders (presets and custom offsets, all-day reminder time, rescheduled whenever data changes or the app starts).
 * Export/import backup file.

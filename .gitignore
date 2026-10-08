@@ -2,6 +2,7 @@
 node_modules/
 dist/
 dist-standalone/
+dist-apk/
 dev-dist/
 coverage/
 *.tsbuildinfo
@@ -13,6 +14,9 @@ coverage/
 !frontend/.env.standalone
 backups/
 backend/data/
+*.jks
+*.keystore
+keystore.properties
 
 # Logs & OS / editor files
 *.log

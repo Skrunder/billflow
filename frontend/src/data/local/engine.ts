@@ -64,7 +64,7 @@ import {
   type EventOccurrenceModel,
   type SettingsModel,
 } from './models';
-import { migrate } from './schema';
+import { migrate, SCHEMA_VERSION } from './schema';
 
 /**
  * LocalRepository — the full app engine running on the device's own SQLite
@@ -105,11 +105,40 @@ export interface UpcomingReminder {
   url: string;
 }
 
+/** Full copy of the on-device database, written to a file by "Back up" in Settings. */
+export interface LocalBackup {
+  format: typeof BACKUP_FORMAT;
+  schemaVersion: number;
+  createdAt: string;
+  tables: Record<string, SqlRow[]>;
+}
+
+export const BACKUP_FORMAT = 'skr-bill-calendar-backup@1';
+
+/** Restored parent-first (foreign keys), deleted in reverse. `meta` is never restored. */
+const BACKUP_TABLES = [
+  'profile',
+  'settings',
+  'categories',
+  'bills',
+  'bill_occurrences',
+  'events',
+  'event_occurrences',
+  'notifications',
+  'audit_logs',
+  'outbox',
+  'sync_state',
+] as const;
+
 export type LocalRepository = DataRepository & {
   /** Auto-pay, horizon extension and due reminders. Runs automatically about once a minute. */
   runMaintenance(): Promise<void>;
   /** The next reminders after "now", soonest first (pending bills and upcoming events only). */
   getUpcomingReminders(options?: { limit?: number; days?: number }): Promise<UpcomingReminder[]>;
+  /** Lossless copy of every table (unlike exportData, which is the server's readable format). */
+  createBackup(): Promise<LocalBackup>;
+  /** Replaces everything on this device with a backup. All or nothing. */
+  restoreBackup(backup: unknown): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -650,6 +679,41 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     }
 
     return out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.key < b.key ? -1 : 1)).slice(0, limit);
+  }
+
+  async function createBackup(): Promise<LocalBackup> {
+    const tables: Record<string, SqlRow[]> = {};
+    for (const t of BACKUP_TABLES) tables[t] = await db.all(`SELECT * FROM ${t}`);
+    return { format: BACKUP_FORMAT, schemaVersion: SCHEMA_VERSION, createdAt: now().toISOString(), tables };
+  }
+
+  async function restoreBackup(input: unknown) {
+    const b = input as Partial<LocalBackup> | null;
+    if (!b || typeof b !== 'object' || b.format !== BACKUP_FORMAT || typeof b.tables !== 'object' || !b.tables) {
+      throw badRequest('This file is not a Bill Calendar backup.');
+    }
+    if (typeof b.schemaVersion !== 'number' || b.schemaVersion > SCHEMA_VERSION) {
+      throw badRequest('This backup was made by a newer version of the app. Update the app, then restore it.');
+    }
+    const tables = b.tables as Record<string, unknown>;
+    if (!Array.isArray(tables.profile) || tables.profile.length !== 1 || !Array.isArray(tables.settings) || tables.settings.length !== 1) {
+      throw badRequest('This backup is incomplete.');
+    }
+    for (const t of [...BACKUP_TABLES].reverse()) await run(`DELETE FROM ${t}`);
+    for (const t of BACKUP_TABLES) {
+      const rows = tables[t] ?? [];
+      if (!Array.isArray(rows)) throw badRequest(`This backup is damaged (${t}).`);
+      // Only columns this version knows; columns added since the backup keep their defaults.
+      const known = new Set((await db.all<{ name: string }>(`SELECT name FROM pragma_table_info('${t}')`)).map((c) => c.name));
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') throw badRequest(`This backup is damaged (${t}).`);
+        const entries = Object.entries(row as Record<string, unknown>).filter(([k]) => known.has(k));
+        if (entries.some(([, v]) => v !== null && typeof v !== 'string' && typeof v !== 'number')) throw badRequest(`This backup is damaged (${t}).`);
+        await run(`INSERT INTO ${t} (${entries.map(([k]) => k).join(', ')}) VALUES (${entries.map(() => '?').join(', ')})`, entries.map(([, v]) => v as SqlValue));
+      }
+    }
+    // Pick up anything the backup's age left behind (horizon, auto-pay, due reminders).
+    await maintenance();
   }
 
   async function maintenance() {
@@ -1486,6 +1550,8 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
 
     // ── local-only ──
     runMaintenance: () => op(maintenance, false),
+    createBackup: () => op(createBackup, false),
+    restoreBackup: (backup) => op(() => restoreBackup(backup), false),
     getUpcomingReminders: ({ limit = 100, days = 60 } = {}) => op(() => upcomingReminders(Math.max(1, Math.min(limit, 500)), days)),
     close: async () => {
       await queue;

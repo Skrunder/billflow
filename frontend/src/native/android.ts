@@ -1,11 +1,13 @@
 import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 import { App } from '@capacitor/app';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
 import { createLocalRepository, type LocalRepository, type UpcomingReminder } from '../data/local/engine';
 import { createNativeSqliteDriver } from '../data/local/native-driver';
 import { queryClient } from '../queryClient';
-import { navigateTo, setPhoneReminders } from './device';
+import { navigateTo, setPhoneReminders, setSaveFile } from './device';
 
 /**
  * Android app startup: opens the on-device SQLite database and wires up the
@@ -79,6 +81,17 @@ export async function openNativeRepository(): Promise<LocalRepository> {
         ],
       });
     },
+  });
+
+  // Exports and backups: written to the app's cache (see res/xml/file_paths.xml), then shared.
+  setSaveFile(async (name, text) => {
+    const { uri } = await Filesystem.writeFile({ path: `exports/${name}`, data: text, directory: Directory.Cache, encoding: Encoding.UTF8, recursive: true });
+    try {
+      await Share.share({ title: name, files: [uri], dialogTitle: 'Save or send' });
+    } catch (err) {
+      // Closing the share sheet without picking anything is not an error.
+      if (!/cancel/i.test(String((err as Error)?.message ?? err))) throw err;
+    }
   });
 
   // Tapping a reminder opens the bill or event it is about.

@@ -1,5 +1,19 @@
 apply plugin: 'com.android.application'
 
+// App version comes from frontend/package.json, so the web app and the APK always match.
+// versionCode must grow with every release: 1.2.3 → 10203.
+def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def (vMajor, vMinor, vPatch) = appVersion.tokenize('.-')[0..2].collect { it as int }
+def appVersionCode = vMajor * 10000 + vMinor * 100 + vPatch
+
+// Release signing: a keystore.properties file kept OUTSIDE the repo (see docs/ANDROID.md),
+// passed with -PskrKeystoreProperties=/path/to/keystore.properties.
+def keystorePropsPath = project.findProperty('skrKeystoreProperties')
+def keystoreProps = new Properties()
+if (keystorePropsPath) {
+    file(keystorePropsPath).withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "com.skr.billcalendar"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +21,8 @@ android {
         applicationId "com.skr.billcalendar"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +30,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystorePropsPath) {
+            release {
+                storeFile file(new File(new File(keystorePropsPath).parentFile, keystoreProps['storeFile']))
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropsPath) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

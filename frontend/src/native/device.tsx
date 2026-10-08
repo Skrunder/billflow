@@ -33,6 +33,22 @@ let phoneReminders: PhoneReminders | null = null;
 export const setPhoneReminders = (impl: PhoneReminders) => void (phoneReminders = impl);
 export const getPhoneReminders = () => phoneReminders;
 
+// ── saving files ──
+
+/** Saves a text file: the Android app offers the share sheet (Drive, Files, email…), a browser downloads it. */
+export type SaveFile = (name: string, text: string, mimeType: string) => Promise<void>;
+
+let saveFileImpl: SaveFile = async (name, text, mimeType) => {
+  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+export const setSaveFile = (impl: SaveFile) => void (saveFileImpl = impl);
+export const saveFile: SaveFile = (...args) => saveFileImpl(...args);
+
 // ── navigation from outside React (notification taps, back button) ──
 
 let navigate: ((to: string | number) => void) | null = null;

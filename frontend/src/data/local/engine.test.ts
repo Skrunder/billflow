@@ -75,7 +75,7 @@ describe('first start', () => {
   });
 
   it('implements every DataRepository method', () => {
-    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'getUpcomingReminders', 'close'].includes(k)).sort();
+    const local = Object.keys(repo).filter((k) => !['runMaintenance', 'getUpcomingReminders', 'createBackup', 'restoreBackup', 'close'].includes(k)).sort();
     expect(local).toEqual(Object.keys(createRemoteRepository()).sort());
     expect(repo.kind).toBe('local');
   });
@@ -245,6 +245,46 @@ describe('background maintenance', () => {
     expect(await repo.getUnreadNotificationCount()).toBe(1);
     await repo.markAllNotificationsRead();
     expect(await repo.getUnreadNotificationCount()).toBe(0);
+  });
+});
+
+describe('backup and restore', () => {
+  async function sample() {
+    const b = await repo.createBill(bill());
+    const [first] = await repo.listBillOccurrences({ billId: b.id });
+    await repo.completeBillOccurrence(first!.id, { confirmationNumber: 'C-9' });
+    await repo.createEvent(event());
+    await repo.updateSettings({ currency: 'CAD', theme: 'DARK' });
+    return { b, first: first! };
+  }
+  const snapshot = async () => {
+    const { exportedAt: _e, ...rest } = (await repo.exportData()) as { exportedAt: string };
+    return rest;
+  };
+
+  it('restores everything exactly, on another device, from the JSON file', async () => {
+    const { first } = await sample();
+    const before = await snapshot();
+    const history = await repo.getHistory('bill-occurrences', first.id);
+    const file = JSON.stringify(await repo.createBackup());
+
+    await fresh(); // a different, brand-new device
+    expect((await repo.listBills()).length).toBe(0);
+    await repo.restoreBackup(JSON.parse(file));
+    expect(await snapshot()).toEqual(before);
+    expect(await repo.getHistory('bill-occurrences', first.id)).toEqual(history);
+    expect((await repo.getProfile()).user.displayName).toBe('Pat');
+  });
+
+  it('rejects other files and newer backups, and a damaged backup changes nothing', async () => {
+    await sample();
+    const before = await snapshot();
+    const backup = await repo.createBackup();
+    await expect(repo.restoreBackup({ hello: 'world' })).rejects.toThrow('not a Bill Calendar backup');
+    await expect(repo.restoreBackup({ ...backup, schemaVersion: 999 })).rejects.toThrow('newer version');
+    const damaged = { ...backup, tables: { ...backup.tables, events: [{ id: 'x', title: { evil: true } }] } };
+    await expect(repo.restoreBackup(damaged)).rejects.toThrow('damaged');
+    expect(await snapshot()).toEqual(before);
   });
 });
 

@@ -1,5 +1,5 @@
-import { Download, LogOut, Send, Smartphone, Tags } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Download, LogOut, Send, Smartphone, Tags, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../api/client';
 import { useChangePassword, useExportData, useMe, useServerConfig, useUpdateProfile, useUpdateSettings } from '../api/hooks';
@@ -15,7 +15,9 @@ import { useToast } from '../components/ui/Toast';
 import { useCanEdit } from '../hooks/useCanEdit';
 import { applyTheme } from '../hooks/useSettings';
 import { currentSubscription, pushSupported, subscribeToPush, unsubscribeFromPush } from '../lib/push';
-import { getPhoneReminders, type PhoneReminderStatus } from '../native/device';
+import { getPhoneReminders, saveFile, type PhoneReminderStatus } from '../native/device';
+import type { LocalRepository } from '../data/local/engine';
+import { queryClient } from '../queryClient';
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -172,6 +174,7 @@ export function SettingsPage() {
         {!standalone && <SecuritySection onReauth={expireSession} />}
 
         <DataSection onDeleted={expireSession} canDeleteAccount={!standalone} />
+        {standalone && <BackupSection />}
       </fieldset>
     </>
   );
@@ -401,6 +404,81 @@ function SecuritySection({ onReauth }: { onReauth: () => void }) {
   );
 }
 
+/** Standalone app: everything lives on this device, so offer a full backup file. */
+function BackupSection() {
+  const repo = useRepository() as LocalRepository;
+  const toast = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<{ name: string; data: unknown; createdAt: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const backup = async () => {
+    try {
+      const data = await repo.createBackup();
+      const stamp = data.createdAt.slice(0, 16).replace(/[T:]/g, '-');
+      await saveFile(`bill-calendar-backup-${stamp}.json`, JSON.stringify(data), 'application/json');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
+  const pick = async (file: File | undefined) => {
+    if (fileInput.current) fileInput.current.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text()) as { createdAt?: unknown };
+      setPending({ name: file.name, data, createdAt: typeof data?.createdAt === 'string' ? data.createdAt : null });
+    } catch {
+      toast.error('This file is not a Bill Calendar backup.');
+    }
+  };
+
+  const restore = async () => {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await repo.restoreBackup(pending.data);
+      setPending(null);
+      await queryClient.invalidateQueries();
+      toast.success('Backup restored');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section title="Backup" description="Your bills and events are stored only on this device. Keep a backup somewhere safe, such as Google Drive.">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-secondary" onClick={backup}>
+          <Download className="h-4 w-4" aria-hidden /> Back up to file
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => fileInput.current?.click()}>
+          <Upload className="h-4 w-4" aria-hidden /> Restore from backup
+        </button>
+        <input ref={fileInput} type="file" accept="application/json,.json" className="hidden" aria-label="Backup file" onChange={(e) => void pick(e.target.files?.[0])} />
+      </div>
+      <Modal open={pending !== null} onClose={() => !busy && setPending(null)} title="Restore this backup?" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Everything currently in the app is replaced by <strong className="break-all">{pending?.name}</strong>
+            {pending?.createdAt && <> (made {new Date(pending.createdAt).toLocaleString()})</>}. This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setPending(null)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" className="btn-danger" onClick={() => void restore()} disabled={busy}>
+              {busy && <Spinner className="h-4 w-4 text-white" />} Replace everything
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </Section>
+  );
+}
+
 function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; canDeleteAccount: boolean }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -412,13 +490,7 @@ function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; c
   const exportData = async () => {
     try {
       const data = await exporter.mutateAsync();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bill-calendar-export-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await saveFile(`bill-calendar-export-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
     } catch (err) {
       toast.error(errorMessage(err));
     }
