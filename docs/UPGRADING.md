@@ -43,6 +43,9 @@ Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen
 
 ## Notes for specific versions
 
+### 1.5.2
+A sign-in fix only; no database changes.
+
 ### 1.5.1
 The web icon files have new names so browsers stop showing the cached old icon. Reload the page once after updating; an installed PWA's home-screen icon may still need a reinstall.
 

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { Response } from 'express';
-import type { User } from '@prisma/client';
+import type { Prisma, User } from '@prisma/client';
 import { env } from '../../config/env';
 import { AppError, badRequest, conflict, forbidden, unauthorized } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -73,9 +73,14 @@ interface ClientInfo {
   userAgent?: string;
 }
 
-async function createSession(userId: string, info: ClientInfo, familyId: string = crypto.randomUUID()) {
+async function createSession(
+  userId: string,
+  info: ClientInfo,
+  familyId: string = crypto.randomUUID(),
+  db: Prisma.TransactionClient = prisma,
+) {
   const token = randomToken(32);
-  await prisma.session.create({
+  await db.session.create({
     data: {
       userId,
       familyId,
@@ -91,7 +96,10 @@ async function createSession(userId: string, info: ClientInfo, familyId: string 
 }
 
 export async function issueTokens(res: Response, user: User, info: ClientInfo, familyId?: string) {
-  const refreshToken = await createSession(user.id, info, familyId);
+  return browserTokens(res, user, await createSession(user.id, info, familyId));
+}
+
+function browserTokens(res: Response, user: User, refreshToken: string) {
   setAuthCookies(res, refreshToken);
   return {
     accessToken: signAccessToken({ sub: user.id, role: user.role, tv: user.tokenVersion }),
@@ -208,7 +216,13 @@ export async function login(email: string, password: string, info: ClientInfo): 
  *   - 'reissue' (phone): the app most likely lost the response to its last
  *     refresh, so whatever was issued since is retired and a new token issued
  */
-async function consumeRefreshToken(token: string | undefined, info: ClientInfo, onRecentReuse: 'sibling' | 'reissue') {
+async function consumeRefreshToken(
+  token: string | undefined,
+  info: ClientInfo,
+  onRecentReuse: 'sibling' | 'reissue',
+  /** Extra check before anything is rotated (throws to refuse). */
+  allow?: (familyId: string) => Promise<void>,
+) {
   if (!token) throw unauthorized('No session');
   const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, include: { user: true } });
   if (!session) throw unauthorized('Session not found');
@@ -246,29 +260,36 @@ async function consumeRefreshToken(token: string | undefined, info: ClientInfo, 
   }
   if (session.expiresAt < new Date()) throw unauthorized('Session expired');
   if (!session.user.isActive) throw unauthorized('Account disabled');
+  await allow?.(session.familyId);
 
-  if (!session.revokedAt) {
-    const now = new Date();
-    const revoked = await prisma.session.updateMany({
-      where: { id: session.id, revokedAt: null },
-      data: { revokedAt: now, lastUsedAt: now },
-    });
-    // A live token proves which one the client holds, so siblings left over from
-    // an earlier race are retired. Only older ones: a concurrent request that lost
-    // the update above is issuing a sibling of its own right now.
-    if (revoked.count) {
-      await prisma.session.updateMany({
-        where: { familyId: session.familyId, revokedAt: null, createdAt: { lt: now } },
-        data: { revokedAt: now },
+  // Retiring the token and issuing its successor commit together. Otherwise a
+  // concurrent request could see the token retired with no successor yet and
+  // take it for a sign-out.
+  const refreshToken = await prisma.$transaction(async (tx) => {
+    if (!session.revokedAt) {
+      const now = new Date();
+      const revoked = await tx.session.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { revokedAt: now, lastUsedAt: now },
       });
+      // A live token proves which one the client holds, so siblings left over from
+      // an earlier race are retired. Only older ones: a concurrent request that lost
+      // the update above is issuing a sibling of its own right now.
+      if (revoked.count) {
+        await tx.session.updateMany({
+          where: { familyId: session.familyId, revokedAt: null, createdAt: { lt: now } },
+          data: { revokedAt: now },
+        });
+      }
     }
-  }
-  return session;
+    return createSession(session.userId, info, session.familyId, tx);
+  });
+  return { user: session.user, familyId: session.familyId, refreshToken };
 }
 
 export async function rotateRefreshToken(res: Response, token: string | undefined, info: ClientInfo) {
-  const session = await consumeRefreshToken(token, info, 'sibling');
-  return issueTokens(res, session.user, info, session.familyId);
+  const { user, refreshToken } = await consumeRefreshToken(token, info, 'sibling');
+  return browserTokens(res, user, refreshToken);
 }
 
 // ─────────────────────────────────────────── native app (phones) ──
@@ -276,7 +297,10 @@ export async function rotateRefreshToken(res: Response, token: string | undefine
 // body and in its own storage. Each sign-in is a device (see sync).
 
 export async function issueNativeTokens(user: User, info: ClientInfo, familyId: string) {
-  const refreshToken = await createSession(user.id, info, familyId);
+  return nativeTokens(user, await createSession(user.id, info, familyId));
+}
+
+function nativeTokens(user: User, refreshToken: string) {
   return {
     accessToken: signAccessToken({ sub: user.id, role: user.role, tv: user.tokenVersion }),
     expiresIn: env.ACCESS_TOKEN_TTL_MINUTES * 60,
@@ -294,10 +318,13 @@ export async function nativeLogin(email: string, password: string, deviceName: s
 }
 
 export async function rotateNativeRefreshToken(token: string | undefined, info: ClientInfo) {
-  const session = await consumeRefreshToken(token, info, 'reissue');
-  const device = await prisma.device.findUnique({ where: { sessionFamilyId: session.familyId } });
-  if (!device || device.revokedAt) throw unauthorized('This device was signed out');
-  return { ...(await issueNativeTokens(session.user, info, session.familyId)), deviceId: device.id };
+  let deviceId = '';
+  const { user, refreshToken } = await consumeRefreshToken(token, info, 'reissue', async (familyId) => {
+    const device = await prisma.device.findUnique({ where: { sessionFamilyId: familyId } });
+    if (!device || device.revokedAt) throw unauthorized('This device was signed out');
+    deviceId = device.id;
+  });
+  return { ...nativeTokens(user, refreshToken), deviceId };
 }
 
 /** Signs a device out: its whole session family and the device record. */

@@ -392,6 +392,18 @@ describe.skipIf(!enabled)('API integration', () => {
       expect((await refresh(cookieOf(d), csrf2)).status).toBe(200);
     });
 
+    it('never signs out a tab that races a rotation', async () => {
+      // A request arriving between the old token's retirement and its successor's
+      // creation used to see "retired, no successor" (a sign-out) and get 401.
+      const { rt, csrf } = await browserLogin();
+      let cookie = rt;
+      for (let round = 0; round < 25; round++) {
+        const results = await Promise.all([refresh(cookie, csrf), refresh(cookie, csrf), refresh(cookie, csrf)]);
+        expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
+        cookie = cookieOf(results[round % 3]);
+      }
+    });
+
     it('does not revive a signed-out session', async () => {
       const { rt, csrf } = await browserLogin();
       const rotated = await refresh(rt, csrf);

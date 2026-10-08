@@ -2,6 +2,10 @@
 
 BillFlow follows semantic versioning (see [docs/UPGRADING.md](docs/UPGRADING.md)). Every release updates the server, the web app and the Android app together.
 
+## 1.5.2 (2026-10-08)
+* Fixed: two browser tabs renewing their sign-in at the same moment could still sign one of them out. Retiring the old sign-in token and issuing its replacement now happen in one database transaction, so the other tab never sees a retired token without a replacement.
+* Docker images are published to Docker Hub and the GitHub Container Registry for every release (amd64 + arm64).
+
 ## 1.5.1 (2026-10-08)
 * Fixed: the web app (Docker) could keep showing the old icon. The icon files have new names, so browsers fetch the new artwork instead of reusing cached copies. An installed PWA may still need reinstalling to change its home-screen icon.
 
