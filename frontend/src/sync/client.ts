@@ -63,6 +63,18 @@ export class SyncError extends Error {
 
 const MAX_ROUNDS = 200;
 
+/** First server version with phone sign-in and sync. */
+export const MIN_SERVER_VERSION = '1.2.0';
+
+/** True when a server version ("1.2.0", "1.10.3-beta") is at least MIN_SERVER_VERSION. */
+export function supportsSync(version: string | undefined): boolean {
+  const parts = (v: string) => v.split(/[.-]/).slice(0, 3).map((n) => Number.parseInt(n, 10) || 0);
+  if (!version || !/^\d+\.\d+/.test(version)) return false;
+  const [a, b] = [parts(version), parts(MIN_SERVER_VERSION)];
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i]! > b[i]!;
+  return true;
+}
+
 function errorMessage(data: unknown, fallback: string) {
   const e = (data as { error?: { message?: string } } | null)?.error;
   return e?.message ?? fallback;
@@ -239,8 +251,15 @@ export function createSyncClient(opts: {
       } catch (err) {
         throw new SyncError((err as Error).message, 'invalid');
       }
-      const health = await call<{ status?: string }>({ method: 'GET', url: `${serverUrl}/api/health`, timeoutMs: 10_000 });
+      const health = await call<{ status?: string; version?: string }>({ method: 'GET', url: `${serverUrl}/api/health`, timeoutMs: 10_000 });
       if (health.status !== 200 || health.data?.status !== 'ok') throw new SyncError('No Bill Calendar server answered at that address.', 'invalid');
+      // Older servers have no phone sign-in: they'd answer it as if the password were wrong.
+      if (!supportsSync(health.data.version)) {
+        throw new SyncError(
+          `This server runs Bill Calendar ${health.data.version ?? '(unknown version)'}; phone sync needs ${MIN_SERVER_VERSION} or newer. Update the server, then connect again.`,
+          'invalid',
+        );
+      }
       if (pendingConnect) await client.cancelConnect();
       const session = await login(serverUrl, email.trim(), password, deviceName);
       pendingConnect = session;

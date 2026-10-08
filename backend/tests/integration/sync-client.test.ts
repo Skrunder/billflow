@@ -207,6 +207,14 @@ describe.skipIf(!enabled)('phone ⇄ server sync (real engine)', () => {
     expect((await webBills()).map((x) => x.name)).toContain('Made while signed out');
   });
 
+  it('a server too old for phone sync is named as such, not as a wrong password', async () => {
+    const C = await phone('Phone C');
+    const oldServer: HttpTransport = async (req) =>
+      req.url.endsWith('/api/health') ? { status: 200, data: { status: 'ok', version: '1.0.0' } } : http(req);
+    const client = createSyncClient({ repo: C.repo, http: oldServer, secrets: { load: async () => null, save: async () => {}, clear: async () => {} } });
+    await expect(client.prepareConnect('localhost', 'sam@example.com', PASSWORD)).rejects.toThrow('This server runs Bill Calendar 1.0.0; phone sync needs 1.2.0 or newer');
+  });
+
   it('wrong password, unreachable or non-https public servers are explained', async () => {
     const C = await phone('Phone C');
     await expect(C.client.prepareConnect('localhost', 'sam@example.com', 'nope nope nope')).rejects.toThrow('Wrong email or password');
