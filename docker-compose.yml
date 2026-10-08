@@ -47,9 +47,12 @@ services:
   # ── BillFlow: API + web app ───────────────────────────────────────────────
   app:
     <<: *hardening
+    # Pulls the published image. To build from this repo instead:
+    #   docker compose up -d --build
     build:
       context: .
-    image: ${BILLFLOW_IMAGE:-billflow:latest}
+    image: ${BILLFLOW_IMAGE:-skrunder/billflow:latest}
+    pull_policy: missing
     restart: unless-stopped
     init: true
     depends_on:

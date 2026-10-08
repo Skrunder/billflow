@@ -87,7 +87,7 @@ Browsers only allow push on **HTTPS** origins (or `localhost`). On iPhone/iPad, 
 
 | Variable | Default | Description |
 |---|---|---|
-| `BILLFLOW_IMAGE` | `billflow:latest` | The app image (API + web app). Set to a registry image to use the prebuilt one: `skrunder/billflow:latest` or `ghcr.io/skrunder/billflow:latest` (published for every release, amd64 + arm64). Before 1.6.0 there were two images, set with `BACKEND_IMAGE` and `FRONTEND_IMAGE`; those are no longer used. |
+| `BILLFLOW_IMAGE` | `skrunder/billflow:latest` | The app image (API + web app), pulled from Docker Hub (published for every release, amd64 + arm64). Pin a release with `:1.6` or `:1.6.0`, or use `ghcr.io/skrunder/billflow:latest`. `docker compose up -d --build` builds it from the repository instead. Before 1.6.0 there were two images, set with `BACKEND_IMAGE` and `FRONTEND_IMAGE`; those are no longer used. |
 
 ## Inside the container (advanced / development)
 

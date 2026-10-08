@@ -37,9 +37,9 @@ Open `http://<host-ip>:8080`.
 1. *Stacks → Add stack → Repository*.
 2. Repository URL: your fork or the project URL. Compose path: `docker-compose.yml`.
 3. Under *Environment variables*, add `POSTGRES_PASSWORD` (and optionally `APP_URL`, `APP_PORT`).
-4. *Deploy the stack*. Portainer builds the image from the repository (or set `BILLFLOW_IMAGE=skrunder/billflow:latest` to pull it instead).
+4. *Deploy the stack*. Portainer pulls the published `skrunder/billflow` image (enable *Re-pull image* on updates).
 
-**Option B: Web editor with the prebuilt image.** Paste `docker-compose.yml`, add `BILLFLOW_IMAGE=skrunder/billflow:latest` and the other environment variables, delete the `build:` block of the `app` service, and deploy.
+**Option B: Web editor with the prebuilt image.** Paste `docker-compose.yml`, add the environment variables, delete the `build:` block of the `app` service, and deploy. It pulls `skrunder/billflow:latest`.
 
 ## Unraid
 
@@ -79,7 +79,7 @@ Install **Docker Compose Manager** from Community Applications (Apps → search 
    APP_DATA_PATH=/mnt/tank/apps/billcal/data
    BACKUP_PATH=/mnt/tank/apps/billcal/backups
    ```
-   Clone the repo into the Dockge stacks directory so the build context exists, or set `BILLFLOW_IMAGE=skrunder/billflow:latest` to use the prebuilt image.
+   It pulls the prebuilt `skrunder/billflow:latest` image; no clone is needed.
 4. Deploy. ZFS snapshots of the datasets are a good extra safety net.
 
 **Older SCALE releases (k3s-based):** run the stack inside a Linux VM, or use the TrueCharts/Dockge "jailmaker" approach, then follow the standard Linux steps.

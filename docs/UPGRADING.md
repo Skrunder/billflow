@@ -24,7 +24,7 @@ Compare `.env.example` with your `.env` after updating and add any new variables
 
 ## Using prebuilt images
 
-If you set `BILLFLOW_IMAGE` to the published image (`skrunder/billflow` on Docker Hub, or `ghcr.io/skrunder/billflow`; every release, amd64 + arm64):
+With the published image (the default `skrunder/billflow` on Docker Hub, or `ghcr.io/skrunder/billflow`; every release, amd64 + arm64):
 
 ```bash
 ./scripts/backup.sh
@@ -48,7 +48,7 @@ BillFlow now runs as **one app container** (`app`, image `billflow`) plus the da
 
 1. Back up (`./scripts/backup.sh`).
 2. Get the new `docker-compose.yml` (`git pull`, or copy it from the release). If you edited yours (Traefik labels, extra networks), move those edits from the old `frontend` service to `app`.
-3. If your `.env` sets `BACKEND_IMAGE` / `FRONTEND_IMAGE`, replace them with `BILLFLOW_IMAGE=skrunder/billflow:latest` (or remove them to build from source).
+3. If your `.env` sets `BACKEND_IMAGE` / `FRONTEND_IMAGE`, remove them (the default is the published `skrunder/billflow:latest`).
 4. Run **`docker compose up -d --remove-orphans`** (add `--build` when building from source). `--remove-orphans` removes the old `backend` and `frontend` containers; without it the old `frontend` keeps port 8080 and the new container can't start. If that already happened (the `app` container then can't reach the database either), run `docker compose up -d --remove-orphans --force-recreate` to fix it.
 5. A reverse proxy that pointed at the container name `frontend` (Docker network, Cloudflare Tunnel) must now point at `app:8080`. Proxies that use the host's port 8080 need no change.
 6. Commands change from `docker compose exec backend …` to `docker compose exec app …`.
