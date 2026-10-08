@@ -51,6 +51,8 @@ Debug and release builds are signed with different keys, so switching between th
 
 ### Publishing a release
 
+Pushing the version tag (`git push origin v<version>`, one tag at a time: GitHub ignores tag pushes of
+more than three tags) runs the tests and publishes the Docker images (`.github/workflows/docker-publish.yml`).
 After tagging a version, attach the signed APK to a GitHub release, under its versioned name and as
 `billflow.apk` (the README's "latest" download link points at that name):
 

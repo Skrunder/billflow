@@ -169,7 +169,18 @@ All settings live in `.env`, next to `docker-compose.yml`. Start from `.env.exam
 
 | Variable | Default | What it does |
 |---|---|---|
-| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | `skr-bill-calendar-backend:latest` / `skr-bill-calendar-frontend:latest` | Image names. By default Compose builds them from this repo; point these at a registry to use prebuilt images. |
+| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | `skr-bill-calendar-backend:latest` / `skr-bill-calendar-frontend:latest` | Image names. By default Compose builds them from this repo. To use the prebuilt images instead, see [Prebuilt images](#prebuilt-images). |
+
+### Prebuilt images
+
+Every release is published to Docker Hub (and the GitHub Container Registry) for x86-64 and ARM64 (Raspberry Pi 4/5, ARM NAS), tagged with the version (`1.5.1`), the minor version (`1.5`) and `latest`. To use them instead of building, add to `.env`:
+
+```
+BACKEND_IMAGE=<dockerhub-user>/billflow-backend:latest
+FRONTEND_IMAGE=<dockerhub-user>/billflow-frontend:latest
+```
+
+Then `docker compose pull && docker compose up -d`. To stay on a version until you choose to update, use a version tag such as `:1.5` instead of `:latest`.
 
 ### Docker Compose services
 

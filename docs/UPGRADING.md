@@ -24,7 +24,7 @@ Compare `.env.example` with your `.env` after updating and add any new variables
 
 ## Using prebuilt images
 
-If you set `BACKEND_IMAGE` / `FRONTEND_IMAGE` to registry images (for example from the project's GitHub Container Registry):
+If you set `BACKEND_IMAGE` / `FRONTEND_IMAGE` to registry images (the project publishes `billflow-backend` and `billflow-frontend` to Docker Hub and the GitHub Container Registry for every release):
 
 ```bash
 ./scripts/backup.sh

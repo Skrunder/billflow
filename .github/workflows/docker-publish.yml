@@ -1,41 +1,88 @@
-# Publishes multi-arch (amd64 + arm64) images to GitHub Container Registry on
-# version tags (v1.2.3). Users can then set BACKEND_IMAGE / FRONTEND_IMAGE to
-# ghcr.io/<owner>/skr-bill-calendar-{backend,frontend}:<version>.
+# Publishes multi-arch (amd64 + arm64) images to Docker Hub and GitHub
+# Container Registry on version tags (v1.2.3), after the CI suite passes:
+#   <dockerhub user>/billflow-{backend,frontend}:{1.2.3, 1.2, latest}
+#   ghcr.io/<owner>/billflow-{backend,frontend}:{1.2.3, 1.2, latest}
+# Users set BACKEND_IMAGE / FRONTEND_IMAGE in .env to use them.
+#
+# Setup (once, repo Settings → Secrets and variables → Actions):
+#   variable DOCKERHUB_USERNAME  your Docker Hub user name
+#   secret   DOCKERHUB_TOKEN     a Docker Hub access token with Read & Write access
+#
+# To publish an existing tag by hand: Actions → Publish images → Run workflow,
+# enter the tag (e.g. v1.5.1). The workflow file always comes from main.
 name: Publish images
 
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to publish (e.g. v1.5.1)
+        required: true
+      latest:
+        description: Also move the "latest" tag to this version
+        type: boolean
+        default: true
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         component: [backend, frontend]
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      LATEST: ${{ github.event_name == 'push' || inputs.latest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Check Docker Hub settings
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Set the DOCKERHUB_USERNAME variable and the DOCKERHUB_TOKEN secret (see the top of this workflow)."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ghcr.io/${{ github.repository_owner }}/skr-bill-calendar-${{ matrix.component }}
+          images: |
+            ${{ vars.DOCKERHUB_USERNAME }}/billflow-${{ matrix.component }}
+            ghcr.io/${{ github.repository_owner }}/billflow-${{ matrix.component }}
+          flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-      - uses: docker/build-push-action@v6
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=raw,value=latest,enable=${{ env.LATEST }}
+          labels: |
+            org.opencontainers.image.title=BillFlow ${{ matrix.component == 'backend' && 'API' || 'Web' }}
+            org.opencontainers.image.description=Self-hosted bill & event calendar
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./${{ matrix.component }}/Dockerfile

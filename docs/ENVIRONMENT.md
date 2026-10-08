@@ -87,7 +87,7 @@ Browsers only allow push on **HTTPS** origins (or `localhost`). On iPhone/iPad, 
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_IMAGE` | `skr-bill-calendar-backend:latest` | Set to a registry image to use prebuilt images. |
+| `BACKEND_IMAGE` | `skr-bill-calendar-backend:latest` | Set to a registry image to use prebuilt images, e.g. `<dockerhub-user>/billflow-backend:latest` or `ghcr.io/skrunder/billflow-backend:latest` (published for every release, amd64 + arm64). |
 | `FRONTEND_IMAGE` | `skr-bill-calendar-frontend:latest` | |
 
 ## Backend-only (advanced / development)
