@@ -17,7 +17,7 @@ docker compose up -d
 | | |
 |---|---|
 | **Android app** | [**Download the latest APK**](https://github.com/Skrunder/billflow/releases/latest/download/billflow.apk) · [all releases](https://github.com/Skrunder/billflow/releases) |
-| **Server and web app** | Self-host with Docker Compose: see [Quick start](#quick-start) |
+| **Server and web app** | Docker image [`skrunder/billflow`](https://hub.docker.com/r/skrunder/billflow) (amd64 + arm64): `docker pull skrunder/billflow:latest`. Setup: [Quick start](#quick-start) |
 
 Each release has the APK twice: `billflow.apk` (the link above always gets the newest) and `billflow-<version>.apk`. While this repository is private, you need to be signed in to GitHub to download. Installing and updating: [Android app](#android-app).
 
@@ -40,21 +40,56 @@ Each release has the APK twice: `billflow.apk` (the link above always gets the n
 
 ## Quick start
 
-Requirements: Docker with the Compose plugin, on any Linux host, NAS or VM. Browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+ (2023 or newer).
+Requirements: Docker with the Compose plugin, on any Linux host, NAS or VM (x86-64 or ARM64). Browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+ (2023 or newer).
+
+### Option 1: prebuilt image from Docker Hub (recommended)
+
+The app is published on Docker Hub as **[`skrunder/billflow`](https://hub.docker.com/r/skrunder/billflow)**. Nothing is built on your server, so it starts in a minute.
+
+```bash
+git clone https://github.com/Skrunder/billflow.git    # for docker-compose.yml and .env.example
+cd billflow
+cp .env.example .env
+# Edit .env:
+#   POSTGRES_PASSWORD=<a long random string>        e.g. output of: openssl rand -hex 24
+#   BILLFLOW_IMAGE=skrunder/billflow:latest
+docker compose pull                                     # downloads skrunder/billflow and postgres
+docker compose up -d
+```
+
+Open **http://&lt;server-ip&gt;:8080**. The first account you create becomes the administrator.
+
+Only `docker-compose.yml` and `.env` are needed on the server: instead of cloning, you can copy those two files into an empty folder (`.env` made from `.env.example`). The repository is private, so `git clone` needs your GitHub login (`gh auth login` or a personal access token).
+
+**Updating** to the newest release:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+**Choosing a version:** `skrunder/billflow:latest` always follows the newest release. To update only when you decide, use a version tag instead: `:1.6` (bug-fix updates of 1.6 only) or `:1.6.0` (exactly that release). All tags are listed on [Docker Hub](https://hub.docker.com/r/skrunder/billflow/tags). To fetch the image by hand: `docker pull skrunder/billflow:latest`.
+
+The image is also published as `ghcr.io/skrunder/billflow` with the same tags. If the Docker Hub repository is private, run `docker login` on the server first.
+
+### Option 2: build from source
 
 ```bash
 git clone https://github.com/Skrunder/billflow.git
 cd billflow
 cp .env.example .env
 # Edit .env and set POSTGRES_PASSWORD (e.g. output of: openssl rand -hex 24)
-docker compose up -d
+docker compose up -d                                    # builds the app image on first start
 ```
 
-Open **http://&lt;server-ip&gt;:8080**. The first account you create becomes the administrator.
+The first start builds the image, which takes a few minutes. To update: `git pull && docker compose up -d --build`.
 
-The repository is private, so `git clone` needs your GitHub login (`gh auth login` or a personal access token). If the server has no internet, build the image on another machine and copy it over: `docker compose build`, then `docker save billflow postgres:16-alpine | gzip > billflow-images.tar.gz`. On the server, run `docker load -i billflow-images.tar.gz` and `docker compose up -d`, with the repo's `docker-compose.yml` and your `.env` next to it.
+### Server without internet
 
-> The first start builds the app image, which takes a few minutes. Later starts are instant. To skip the build, use the [prebuilt image](#prebuilt-images).
+Pull or build the image on another machine and copy it over: `docker save skrunder/billflow:latest postgres:16-alpine | gzip > billflow-images.tar.gz` (or `billflow` instead of `skrunder/billflow:latest` if you built it). On the server, put `docker-compose.yml` and your `.env` in a folder, then run `docker load -i billflow-images.tar.gz` and `docker compose up -d`.
+
+### Updating from 1.5 or older
+
+Releases before 1.6.0 ran two containers (`backend` and `frontend`). The first time you update, run `docker compose up -d --remove-orphans` so the old containers are removed and free port 8080. Your data is kept. See [docs/UPGRADING.md](docs/UPGRADING.md).
 
 ## Using BillFlow
 
@@ -173,13 +208,7 @@ All settings live in `.env`, next to `docker-compose.yml`. Start from `.env.exam
 
 ### Prebuilt images
 
-BillFlow ships as **one image**, `skrunder/billflow`, with the API and the web app together (plus the official `postgres` image for the database). Every release is published to Docker Hub (and as `ghcr.io/skrunder/billflow`) for x86-64 and ARM64 (Raspberry Pi 4/5, ARM NAS), tagged with the version (`1.6.0`), the minor version (`1.6`) and `latest`. To use it instead of building, add to `.env`:
-
-```
-BILLFLOW_IMAGE=skrunder/billflow:latest
-```
-
-Then `docker compose pull && docker compose up -d`. To stay on a version until you choose to update, use a version tag such as `:1.6` instead of `:latest`.
+BillFlow ships as **one image**, [`skrunder/billflow`](https://hub.docker.com/r/skrunder/billflow), with the API and the web app together (plus the official `postgres` image for the database). Every release is published to Docker Hub (and as `ghcr.io/skrunder/billflow`) for x86-64 and ARM64 (Raspberry Pi 4/5, ARM NAS), tagged with the version (`1.6.0`), the minor version (`1.6`) and `latest`. Set `BILLFLOW_IMAGE` in `.env` to use it, as in [Option 1](#option-1-prebuilt-image-from-docker-hub-recommended) of the Quick start.
 
 ### Docker Compose services
 
