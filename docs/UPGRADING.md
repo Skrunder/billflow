@@ -6,33 +6,33 @@ The app follows **semantic versioning**:
 * **Minor** (1.x.0): new features and additive database migrations. Safe in place.
 * **Major** (x.0.0): may include breaking changes or destructive migrations. Read the release notes first.
 
-Database migrations run automatically when the new backend container starts. Your data volumes are never touched by an image update.
+Database migrations run automatically when the new app container starts. Your data volumes are never touched by an image update.
 
 ## Standard update (Docker Compose, built from source)
 
 ```bash
-cd skr-bill-calendar
+cd billflow
 ./scripts/backup.sh                 # 1. always back up first
 git fetch --tags
 git checkout v1.2.0                 # 2. or: git pull  (to follow main)
-docker compose build --pull         # 3. rebuild images with fresh base images
-docker compose up -d                # 4. recreate containers; migrations apply on start
-docker compose logs -f backend      # 5. watch for "database schema is up to date"
+docker compose build --pull         # 3. rebuild the image with fresh base images
+docker compose up -d --remove-orphans   # 4. recreate containers; migrations apply on start
+docker compose logs -f app          # 5. watch for "database schema is up to date"
 ```
 
 Compare `.env.example` with your `.env` after updating and add any new variables you want. New variables always have safe defaults.
 
 ## Using prebuilt images
 
-If you set `BACKEND_IMAGE` / `FRONTEND_IMAGE` to registry images (the project publishes `billflow-backend` and `billflow-frontend` to Docker Hub and the GitHub Container Registry for every release):
+If you set `BILLFLOW_IMAGE` to the published image (`skrunder/billflow` on Docker Hub, or `ghcr.io/skrunder/billflow`; every release, amd64 + arm64):
 
 ```bash
 ./scripts/backup.sh
 docker compose pull
-docker compose up -d
+docker compose up -d --remove-orphans
 ```
 
-Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen only when you choose.
+Pin a version tag (`:1.6.0`) rather than `:latest` if you want updates to happen only when you choose.
 
 ## Platform notes
 
@@ -42,6 +42,18 @@ Pin a version tag (`:1.2.0`) rather than `:latest` if you want updates to happen
 * **Synology Container Manager:** Project → *Action → Build* (source) or pull new images, then *Start*.
 
 ## Notes for specific versions
+
+### 1.6.0: one container
+BillFlow now runs as **one app container** (`app`, image `billflow`) plus the database. The API serves the web app itself; the separate nginx `frontend` container is gone. Your data is untouched: the database and data volumes keep their names.
+
+1. Back up (`./scripts/backup.sh`).
+2. Get the new `docker-compose.yml` (`git pull`, or copy it from the release). If you edited yours (Traefik labels, extra networks), move those edits from the old `frontend` service to `app`.
+3. If your `.env` sets `BACKEND_IMAGE` / `FRONTEND_IMAGE`, replace them with `BILLFLOW_IMAGE=skrunder/billflow:latest` (or remove them to build from source).
+4. Run **`docker compose up -d --remove-orphans`** (add `--build` when building from source). `--remove-orphans` removes the old `backend` and `frontend` containers; without it the old `frontend` keeps port 8080 and the new container can't start. If that already happened (the `app` container then can't reach the database either), run `docker compose up -d --remove-orphans --force-recreate` to fix it.
+5. A reverse proxy that pointed at the container name `frontend` (Docker network, Cloudflare Tunnel) must now point at `app:8080`. Proxies that use the host's port 8080 need no change.
+6. Commands change from `docker compose exec backend …` to `docker compose exec app …`.
+
+**No internet on the server?** Copy the image over: `docker save billflow postgres:16-alpine | gzip > billflow-images.tar.gz` on a machine that built it, then `docker load -i billflow-images.tar.gz` and step 4 on the server.
 
 ### 1.5.2
 A sign-in fix only; no database changes.
@@ -63,7 +75,7 @@ Adds two columns (estimated amounts). Back up first as always; the migration run
 ```bash
 docker compose ps                                    # all services "healthy"
 curl -s http://localhost:8080/api/health             # {"status":"ok","version":"…"}
-docker compose exec backend node dist/cli.js migrate-status
+docker compose exec app node dist/cli.js migrate-status
 ```
 
 ## Rolling back

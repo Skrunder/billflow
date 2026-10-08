@@ -61,6 +61,8 @@ const schema = z.object({
   PORT: int(4000, 1, 65535),
   APP_URL: z.string().url().default('http://localhost:8080'),
   DATA_DIR: optionalString,
+  /** Built web app to serve alongside the API (set in the Docker image). */
+  WEB_DIR: optionalString,
 
   DATABASE_URL: optionalString,
   POSTGRES_HOST: z.string().default('db'),

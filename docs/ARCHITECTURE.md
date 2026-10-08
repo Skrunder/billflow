@@ -9,8 +9,7 @@ flowchart LR
   end
   RP[Optional reverse proxy<br/>NPM · Traefik · Cloudflare Tunnel · nginx<br/>TLS termination]
   subgraph Docker Compose stack
-    FE["frontend (nginx-unprivileged :8080)<br/>static PWA + /api reverse proxy"]
-    BE["backend (Node 22 / Express :4000)<br/>REST API · auth · scheduler"]
+    BE["app (Node 22 / Express :8080)<br/>web app (PWA) · REST API · auth · scheduler"]
     DB[("db (PostgreSQL 16)<br/>volume: db_data")]
     BK["backup (optional profile)<br/>pg_dump loop → ./backups"]
     VOL[("backend_data volume<br/>generated secrets · future uploads")]
@@ -18,9 +17,8 @@ flowchart LR
   SMTP[(SMTP server)]
   PUSH[(Web Push services<br/>FCM · APNs · Mozilla)]
 
-  B -- HTTPS --> RP --> FE
-  B -. LAN HTTP .-> FE
-  FE -- /api/* --> BE
+  B -- HTTPS --> RP --> BE
+  B -. LAN HTTP .-> BE
   BE --> DB
   BE --- VOL
   BK --> DB
@@ -28,7 +26,7 @@ flowchart LR
   BE -- VAPID --> PUSH --> B
 ```
 
-**Single public entry point.** Only the frontend container publishes a port. nginx serves the built PWA and proxies `/api/*` to the backend over the private Compose network. The browser therefore sees one origin, which removes CORS, allows `SameSite=Strict` cookies, and gives a reverse proxy exactly one upstream to point at.
+**Single public entry point.** One container, `app`, publishes port 8080. The API process also serves the built PWA (`backend/src/web.ts`: precompressed files, per-type caching, SPA fallback, web security headers); since 1.6.0 there is no separate nginx container. The browser therefore sees one origin, which removes CORS, allows `SameSite=Strict` cookies, and gives a reverse proxy exactly one upstream to point at.
 
 **Backend responsibilities**
 
@@ -102,7 +100,7 @@ sequenceDiagram
 | Password reset | One-time token (SHA-256 stored, 1 h, single use). Success revokes all sessions. Responses never reveal whether an email exists. Without SMTP, admins use the CLI. |
 | Email verification | Optional (`REQUIRE_EMAIL_VERIFICATION=true` and SMTP configured), 48 h one-time token. |
 | Authorization | Every query is scoped by `userId` from the verified token. Cross-user ids return 404 rather than 403, so existence is not leaked. |
-| Transport & headers | helmet on the API; strict CSP, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy and Permissions-Policy from nginx. HSTS belongs on the TLS-terminating proxy. |
+| Transport & headers | helmet on the API (`default-src 'none'`); for the web app (`backend/src/web.ts`) a strict CSP, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy and Permissions-Policy. HSTS is sent when `APP_URL` is https; the TLS-terminating proxy may add it too. |
 
 ## 6. React component architecture
 
@@ -140,7 +138,8 @@ main.tsx
 
 ```
 .
-├── docker-compose.yml          # db · backend · frontend · backup (profile)
+├── Dockerfile                  # the app image: API + built web app
+├── docker-compose.yml          # app · db · backup (profile)
 ├── .env.example
 ├── scripts/                    # backup.sh · restore.sh
 ├── package.json                # npm workspaces root
@@ -152,7 +151,7 @@ main.tsx
 │       │                       # schemas (zod) · types (API contracts) · format · defaults
 │       └── tests/
 ├── backend/
-│   ├── Dockerfile · docker-entrypoint.sh
+│   ├── docker-entrypoint.sh
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   └── migrations/<timestamp>_<name>/migration.sql
@@ -169,7 +168,6 @@ main.tsx
 │   │   └── scripts/database-url.ts
 │   └── tests/                  # unit + API integration tests (vitest + supertest)
 └── frontend/
-    ├── Dockerfile · nginx/
     ├── public/                 # icons, favicon, theme-init.js
     └── src/
         ├── main.tsx · App.tsx · sw.ts · queryClient.ts · index.css
@@ -188,13 +186,10 @@ main.tsx
 | Container | Image | User | Port | Health check | Persistence |
 |---|---|---|---|---|---|
 | `db` | `postgres:16-alpine` | postgres | internal 5432 | `pg_isready` | `db_data` → `/var/lib/postgresql/data` |
-| `backend` | built from `backend/Dockerfile` (node:22-alpine, multi-stage) | `node` (1000) | internal 4000 | `GET /api/health/ready` (checks DB) | `backend_data` → `/app/data` |
-| `frontend` | built from `frontend/Dockerfile` (nginx-unprivileged) | `nginx` (101) | **8080 published** | `GET /healthz` | none (stateless) |
+| `app` | `billflow`, built from the root `Dockerfile` (node:22-alpine, multi-stage: API + web app) | `node` (1000) | **8080 published** | `GET /api/health/ready` (checks DB) | `backend_data` → `/app/data` |
 | `backup` *(profile)* | `postgres:16-alpine` | root | none | — | `./backups` bind mount |
 
-Hardening: `no-new-privileges`; `cap_drop: ALL` on app containers; backend runs with a **read-only root filesystem** (tmpfs `/tmp`); `init: true` (tini) for signal handling; json-file log rotation; startup ordering via `depends_on: condition: service_healthy`. The backend entrypoint applies migrations before starting (`RUN_MIGRATIONS=true`).
-
-nginx re-resolves the backend's DNS name every 10 s using the container's own resolver (`NGINX_ENTRYPOINT_LOCAL_RESOLVERS`, which works on Docker and Podman), so recreating the backend never leaves the frontend pointing at a stale IP.
+Hardening: `no-new-privileges`; `cap_drop: ALL` on the app container, which runs with a **read-only root filesystem** (tmpfs `/tmp`); `init: true` (tini) for signal handling; json-file log rotation; startup ordering via `depends_on: condition: service_healthy`. The entrypoint applies migrations before starting (`RUN_MIGRATIONS=true`). `/healthz` answers without touching the database (for proxies and uptime checks).
 
 ### Designed for future growth
 

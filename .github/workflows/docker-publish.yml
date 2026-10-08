@@ -1,15 +1,17 @@
-# Publishes multi-arch (amd64 + arm64) images to Docker Hub and GitHub
+# Publishes the multi-arch (amd64 + arm64) app image to Docker Hub and GitHub
 # Container Registry on version tags (v1.2.3), after the CI suite passes:
-#   <dockerhub user>/billflow-{backend,frontend}:{1.2.3, 1.2, latest}
-#   ghcr.io/<owner>/billflow-{backend,frontend}:{1.2.3, 1.2, latest}
-# Users set BACKEND_IMAGE / FRONTEND_IMAGE in .env to use them.
+#   <dockerhub user>/billflow:{1.2.3, 1.2, latest}
+#   ghcr.io/<owner>/billflow:{1.2.3, 1.2, latest}
+# Users set BILLFLOW_IMAGE in .env to use it.
 #
 # Setup (once, repo Settings → Secrets and variables → Actions):
 #   variable DOCKERHUB_USERNAME  your Docker Hub user name
 #   secret   DOCKERHUB_TOKEN     a Docker Hub access token with Read & Write access
+# and create the "billflow" repository on Docker Hub (Read & Write tokens can't).
 #
 # To publish an existing tag by hand: Actions → Publish images → Run workflow,
-# enter the tag (e.g. v1.5.1). The workflow file always comes from main.
+# enter the tag (v1.6.0 or later: the single image). The workflow file always
+# comes from main.
 name: Publish images
 
 on:
@@ -38,9 +40,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        component: [backend, frontend]
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
       LATEST: ${{ github.event_name == 'push' || inputs.latest }}
@@ -72,24 +71,23 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
-            ${{ vars.DOCKERHUB_USERNAME }}/billflow-${{ matrix.component }}
-            ghcr.io/${{ github.repository_owner }}/billflow-${{ matrix.component }}
+            ${{ vars.DOCKERHUB_USERNAME }}/billflow
+            ghcr.io/${{ github.repository_owner }}/billflow
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}},value=${{ env.TAG }}
             type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
             type=raw,value=latest,enable=${{ env.LATEST }}
           labels: |
-            org.opencontainers.image.title=BillFlow ${{ matrix.component == 'backend' && 'API' || 'Web' }}
+            org.opencontainers.image.title=BillFlow
             org.opencontainers.image.description=Self-hosted bill & event calendar
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: ./${{ matrix.component }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: APP_VERSION=${{ steps.meta.outputs.version }}
-          cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+          cache-from: type=gha,scope=billflow
+          cache-to: type=gha,mode=max,scope=billflow

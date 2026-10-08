@@ -4,7 +4,7 @@
 #
 # Creates, in ./backups (or $BACKUP_PATH):
 #   billcalendar-<timestamp>.dump      PostgreSQL custom-format dump (all data)
-#   appdata-<timestamp>.tar.gz         backend data volume (generated secrets, uploads)
+#   appdata-<timestamp>.tar.gz         app data volume (generated secrets, uploads)
 #
 # Usage:  ./scripts/backup.sh            (run from the project directory)
 # Safe to run while the app is running (pg_dump takes a consistent snapshot).
@@ -34,8 +34,8 @@ $COMPOSE exec -T db pg_dump -U "$DB_USER" -d "$DB_NAME" --format=custom > "$OUT/
 mv "$OUT/billcalendar-$STAMP.dump.partial" "$OUT/billcalendar-$STAMP.dump"
 echo "  $OUT/billcalendar-$STAMP.dump ($(du -h "$OUT/billcalendar-$STAMP.dump" | cut -f1))"
 
-echo "→ Archiving backend data volume…"
-$COMPOSE exec -T backend tar -C /app/data -czf - . > "$OUT/appdata-$STAMP.tar.gz"
+echo "→ Archiving app data volume…"
+$COMPOSE exec -T app tar -C /app/data -czf - . > "$OUT/appdata-$STAMP.tar.gz"
 echo "  $OUT/appdata-$STAMP.tar.gz"
 
 echo "✓ Backup complete. Copy $OUT somewhere off this machine (NAS share, cloud, USB)."

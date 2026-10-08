@@ -70,7 +70,7 @@ Enables password-reset emails, email verification and email reminders.
 
 | Variable | Default | Description |
 |---|---|---|
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | – | Generate with `docker compose run --rm backend node dist/cli.js generate-vapid-keys`. Set both or neither. |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | – | Generate with `docker compose run --rm app node dist/cli.js generate-vapid-keys`. Set both or neither. |
 | `VAPID_SUBJECT` | `mailto:admin@localhost` | Contact URI sent to push services. |
 
 Browsers only allow push on **HTTPS** origins (or `localhost`). On iPhone/iPad, push works in the installed Home Screen app (iOS 16.4+).
@@ -83,15 +83,12 @@ Browsers only allow push on **HTTPS** origins (or `localhost`). On iPhone/iPad, 
 | `BACKUP_INTERVAL_HOURS` | `24` | |
 | `BACKUP_KEEP_DAYS` | `14` | Older dumps are deleted. |
 
-## Images
+## Image
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_IMAGE` | `skr-bill-calendar-backend:latest` | Set to a registry image to use prebuilt images, e.g. `<dockerhub-user>/billflow-backend:latest` or `ghcr.io/skrunder/billflow-backend:latest` (published for every release, amd64 + arm64). |
-| `FRONTEND_IMAGE` | `skr-bill-calendar-frontend:latest` | |
+| `BILLFLOW_IMAGE` | `billflow:latest` | The app image (API + web app). Set to a registry image to use the prebuilt one: `skrunder/billflow:latest` or `ghcr.io/skrunder/billflow:latest` (published for every release, amd64 + arm64). Before 1.6.0 there were two images, set with `BACKEND_IMAGE` and `FRONTEND_IMAGE`; those are no longer used. |
 
-## Backend-only (advanced / development)
+## Inside the container (advanced / development)
 
-`NODE_ENV`, `HOST` (`0.0.0.0`), `PORT` (`4000`), `DATA_DIR` (`/app/data`), `LOG_PRETTY` (`false`), `CORS_ORIGINS` (comma-separated, only for serving the frontend from a different origin), `POSTGRES_HOST` (`db`), `POSTGRES_PORT` (`5432`).
-
-The frontend container reads `BACKEND_URL` (default `http://backend:4000`).
+`NODE_ENV`, `HOST` (`0.0.0.0`), `PORT` (`8080` in the image, `4000` in development), `DATA_DIR` (`/app/data`), `WEB_DIR` (`/app/web` in the image: the built web app the API serves; unset in development, where Vite serves it), `LOG_PRETTY` (`false`), `CORS_ORIGINS` (comma-separated, only for serving the web app from a different origin), `POSTGRES_HOST` (`db`), `POSTGRES_PORT` (`5432`).

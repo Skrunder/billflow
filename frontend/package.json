@@ -1,6 +1,6 @@
 {
   "name": "skr-bill-calendar-frontend",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -32,7 +32,7 @@
     "@fullcalendar/luxon3": "6.1.17",
     "@fullcalendar/react": "6.1.17",
     "@fullcalendar/timegrid": "6.1.17",
-    "@skr/core": "1.5.2",
+    "@skr/core": "1.6.0",
     "@tanstack/query-sync-storage-persister": "5.80.7",
     "@tanstack/react-query": "5.80.7",
     "@tanstack/react-query-persist-client": "5.80.7",

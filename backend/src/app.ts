@@ -22,6 +22,7 @@ import { healthRouter } from './modules/health/health.routes';
 import { notificationsRouter, pushRouter } from './modules/notifications/notifications.routes';
 import { syncRouter } from './modules/sync/sync.routes';
 import { usersRouter } from './modules/users/users.routes';
+import { webApp } from './web';
 
 function parseTrustProxy(value: string): boolean | number | string {
   const v = value.trim();
@@ -31,7 +32,7 @@ function parseTrustProxy(value: string): boolean | number | string {
   return v;
 }
 
-export function createApp() {
+export function createApp(options: { webDir?: string } = { webDir: env.WEB_DIR }) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -49,12 +50,14 @@ export function createApp() {
         res.setHeader('X-Request-Id', id);
         return id;
       },
-      autoLogging: { ignore: (req) => req.url?.startsWith('/api/health') ?? false },
+      // Log API calls only: health checks and web-app files would drown them out.
+      autoLogging: { ignore: (req) => !req.url?.startsWith('/api/') || req.url.startsWith('/api/health') },
       customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
     }),
   );
 
   app.use(
+    '/api',
     helmet({
       contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
       crossOriginResourcePolicy: { policy: 'same-origin' },
@@ -71,7 +74,7 @@ export function createApp() {
   const syncJson = express.json({ limit: '8mb' });
   app.use((req, res, next) => (req.path === '/api/v1/sync/push' ? syncJson : smallJson)(req, res, next));
   app.use(cookieParser());
-  app.use((_req, res, next) => {
+  app.use('/api', (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
@@ -101,6 +104,8 @@ export function createApp() {
   app.use('/api/v1', api);
   // Unversioned alias for the health checks used by Docker.
   app.use('/api/health', healthRouter);
+
+  if (options.webDir) app.use(webApp(options.webDir, { hsts: env.cookieSecure }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

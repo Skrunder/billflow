@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 /**
  * Administration CLI. Run inside the backend container, e.g.:
- *   docker compose exec backend node dist/cli.js list-users
- *   docker compose exec backend node dist/cli.js reset-password me@example.com
+ *   docker compose exec app node dist/cli.js list-users
+ *   docker compose exec app node dist/cli.js reset-password me@example.com
  */
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';

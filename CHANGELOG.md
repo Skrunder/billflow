@@ -2,6 +2,11 @@
 
 BillFlow follows semantic versioning (see [docs/UPGRADING.md](docs/UPGRADING.md)). Every release updates the server, the web app and the Android app together.
 
+## 1.6.0: one container (2026-10-08)
+* **BillFlow now ships as a single image** (`skrunder/billflow` on Docker Hub, `ghcr.io/skrunder/billflow`; amd64 + arm64) plus PostgreSQL. The API serves the web app itself, so the separate nginx container is gone: one fewer container to run, update and publish.
+* The Compose service is now `app` (`docker compose exec app …`); `BILLFLOW_IMAGE` replaces `BACKEND_IMAGE` / `FRONTEND_IMAGE`. Data volumes keep their names, so updating keeps everything. **Update with `docker compose up -d --remove-orphans`** (see [docs/UPGRADING.md](docs/UPGRADING.md)).
+* The web app keeps the same caching, compression, security headers and offline support as before.
+
 ## 1.5.2 (2026-10-08)
 * Fixed: two browser tabs renewing their sign-in at the same moment could still sign one of them out. Retiring the old sign-in token and issuing its replacement now happen in one database transaction, so the other tab never sees a retired token without a replacement.
 * Docker images are published to Docker Hub and the GitHub Container Registry for every release (amd64 + arm64).

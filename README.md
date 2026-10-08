@@ -52,9 +52,9 @@ docker compose up -d
 
 Open **http://&lt;server-ip&gt;:8080**. The first account you create becomes the administrator.
 
-The repository is private, so `git clone` needs your GitHub login (`gh auth login` or a personal access token). If the server has no internet, build the images on another machine and copy them over: `docker compose build`, then `docker save skr-bill-calendar-backend skr-bill-calendar-frontend postgres:16-alpine | gzip > billflow-images.tar.gz`. On the server, run `docker load -i billflow-images.tar.gz` and `docker compose up -d`, with the repo's `docker-compose.yml` and your `.env` next to it.
+The repository is private, so `git clone` needs your GitHub login (`gh auth login` or a personal access token). If the server has no internet, build the image on another machine and copy it over: `docker compose build`, then `docker save billflow postgres:16-alpine | gzip > billflow-images.tar.gz`. On the server, run `docker load -i billflow-images.tar.gz` and `docker compose up -d`, with the repo's `docker-compose.yml` and your `.env` next to it.
 
-> The first start builds the images, which takes a few minutes. Later starts are instant.
+> The first start builds the app image, which takes a few minutes. Later starts are instant. To skip the build, use the [prebuilt image](#prebuilt-images).
 
 ## Using BillFlow
 
@@ -154,7 +154,7 @@ All settings live in `.env`, next to `docker-compose.yml`. Start from `.env.exam
 
 | Variable | Default | What it does |
 |---|---|---|
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(empty = push off)* | Generate a pair with `docker compose run --rm backend node dist/cli.js generate-vapid-keys`. Push also needs HTTPS. |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(empty = push off)* | Generate a pair with `docker compose run --rm app node dist/cli.js generate-vapid-keys`. Push also needs HTTPS. |
 | `VAPID_SUBJECT` | `mailto:admin@localhost` | Contact address given to the push services. |
 
 **Backups (optional `backup` profile)**
@@ -169,31 +169,29 @@ All settings live in `.env`, next to `docker-compose.yml`. Start from `.env.exam
 
 | Variable | Default | What it does |
 |---|---|---|
-| `BACKEND_IMAGE` / `FRONTEND_IMAGE` | `skr-bill-calendar-backend:latest` / `skr-bill-calendar-frontend:latest` | Image names. By default Compose builds them from this repo. To use the prebuilt images instead, see [Prebuilt images](#prebuilt-images). |
+| `BILLFLOW_IMAGE` | `billflow:latest` | The app image. By default Compose builds it from this repo. To use the prebuilt image instead, see [Prebuilt images](#prebuilt-images). |
 
 ### Prebuilt images
 
-Every release is published to Docker Hub (and the GitHub Container Registry) for x86-64 and ARM64 (Raspberry Pi 4/5, ARM NAS), tagged with the version (`1.5.1`), the minor version (`1.5`) and `latest`. To use them instead of building, add to `.env`:
+BillFlow ships as **one image**, `skrunder/billflow`, with the API and the web app together (plus the official `postgres` image for the database). Every release is published to Docker Hub (and as `ghcr.io/skrunder/billflow`) for x86-64 and ARM64 (Raspberry Pi 4/5, ARM NAS), tagged with the version (`1.6.0`), the minor version (`1.6`) and `latest`. To use it instead of building, add to `.env`:
 
 ```
-BACKEND_IMAGE=<dockerhub-user>/billflow-backend:latest
-FRONTEND_IMAGE=<dockerhub-user>/billflow-frontend:latest
+BILLFLOW_IMAGE=skrunder/billflow:latest
 ```
 
-Then `docker compose pull && docker compose up -d`. To stay on a version until you choose to update, use a version tag such as `:1.5` instead of `:latest`.
+Then `docker compose pull && docker compose up -d`. To stay on a version until you choose to update, use a version tag such as `:1.6` instead of `:latest`.
 
 ### Docker Compose services
 
-`docker-compose.yml` runs these containers on a private network. Only the web container publishes a port.
+`docker-compose.yml` runs these containers on a private network. Only `app` publishes a port.
 
 | Service | Image | What it does | Data |
 |---|---|---|---|
+| `app` | `billflow` (built from `Dockerfile`, or `BILLFLOW_IMAGE`) | The whole app: the web app, the API, reminders and auto-pay jobs. Runs database migrations on start. | `backend_data` volume (or `APP_DATA_PATH`) |
 | `db` | `postgres:16-alpine` | PostgreSQL database. | `db_data` volume (or `DB_DATA_PATH`) |
-| `backend` | built from `backend/Dockerfile` | The API, reminders and auto-pay jobs. Runs database migrations on start. | `backend_data` volume (or `APP_DATA_PATH`) |
-| `frontend` | built from `frontend/Dockerfile` | nginx serving the web app and passing `/api` to the backend. | none |
 | `backup` | `postgres:16-alpine` | **Optional** (`--profile backup`). Writes a `pg_dump` every `BACKUP_INTERVAL_HOURS` to `BACKUP_PATH`. | host folder |
 
-Each service waits for the one before it to be healthy, restarts automatically (`unless-stopped`), and runs hardened: no privilege escalation, Linux capabilities dropped, logs capped at 5 × 10 MB, and the backend with a read-only filesystem. The Compose project is named `skr-bill-calendar` (kept from the app's old name so existing volumes stay attached).
+Each service waits for the one before it to be healthy, restarts automatically (`unless-stopped`), and runs hardened: no privilege escalation, Linux capabilities dropped, logs capped at 5 × 10 MB, and the app with a read-only filesystem. The Compose project is named `skr-bill-calendar` and the app's volume `backend_data` (kept from before 1.6.0 so existing data stays attached).
 
 Common commands:
 
@@ -201,11 +199,13 @@ Common commands:
 docker compose up -d                       # start, or apply .env changes
 docker compose --profile backup up -d      # start with automatic backups
 docker compose ps                          # status and health
-docker compose logs -f backend             # follow the API logs
+docker compose logs -f app                 # follow the app's logs
 docker compose pull && docker compose up -d     # update when using registry images
 git pull && docker compose up -d --build        # update when building from source
 docker compose down                        # stop (data volumes are kept)
 ```
+
+**Updating from 1.5 or older** (two containers, `backend` and `frontend`): run `docker compose up -d --remove-orphans` once, so the old containers are removed and free port 8080. (Forgot the flag? `docker compose up -d --remove-orphans --force-recreate` fixes it.) See [docs/UPGRADING.md](docs/UPGRADING.md).
 
 ## Documentation
 
@@ -226,14 +226,14 @@ docker compose down                        # stop (data volumes are kept)
 The backend image ships a small CLI:
 
 ```bash
-docker compose exec backend node dist/cli.js list-users
-docker compose exec backend node dist/cli.js reset-password you@example.com          # prints a random password
-docker compose exec backend node dist/cli.js reset-password you@example.com 'NewPass!'
-docker compose exec backend node dist/cli.js set-role friend@example.com ADMIN
-docker compose exec backend node dist/cli.js disable-user someone@example.com
-docker compose exec backend node dist/cli.js unlock-user you@example.com
-docker compose exec backend node dist/cli.js migrate-status                          # applied DB migrations
-docker compose exec backend node dist/cli.js generate-vapid-keys                      # for push notifications
+docker compose exec app node dist/cli.js list-users
+docker compose exec app node dist/cli.js reset-password you@example.com          # prints a random password
+docker compose exec app node dist/cli.js reset-password you@example.com 'NewPass!'
+docker compose exec app node dist/cli.js set-role friend@example.com ADMIN
+docker compose exec app node dist/cli.js disable-user someone@example.com
+docker compose exec app node dist/cli.js unlock-user you@example.com
+docker compose exec app node dist/cli.js migrate-status                          # applied DB migrations
+docker compose exec app node dist/cli.js generate-vapid-keys                      # for push notifications
 ```
 
 Without SMTP configured, `reset-password` is how a forgotten password gets reset.
@@ -280,11 +280,11 @@ npm test                                                                        
 
 The backend integration suite proves the core guarantees. Completing, skipping or reopening one occurrence never changes another, each occurrence keeps its own history, template edits preserve completed occurrences, users cannot see each other's data, and refresh-token rotation and CSRF behave as designed.
 
-Docker images are built from the **repository root** (`docker build -f backend/Dockerfile .`), because both apps include `packages/core`.
+The Docker image is built from the **repository root** (`docker build -t billflow .`). It contains the API and the built web app, which the API serves (`WEB_DIR`); in development, Vite serves the web app instead.
 
 ## Tech stack
 
-React 18 · TypeScript · Tailwind CSS 4 · FullCalendar · TanStack Query · Vite PWA, on Node.js 22 · Express 5 · Prisma 6 · PostgreSQL 16, served by nginx (unprivileged) in Docker Compose.
+React 18 · TypeScript · Tailwind CSS 4 · FullCalendar · TanStack Query · Vite PWA, on Node.js 22 · Express 5 · Prisma 6 · PostgreSQL 16, in Docker Compose (one app container plus PostgreSQL).
 
 ## License
 

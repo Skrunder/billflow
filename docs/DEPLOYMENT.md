@@ -21,8 +21,8 @@ On Proxmox, use a Debian/Ubuntu **VM** or a **privileged LXC with nesting enable
 
 ```bash
 curl -fsSL https://get.docker.com | sh          # if Docker isn't installed yet
-git clone https://github.com/<you>/skr-bill-calendar.git
-cd skr-bill-calendar
+git clone https://github.com/Skrunder/billflow.git
+cd billflow
 cp .env.example .env
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
 docker compose up -d
@@ -37,9 +37,9 @@ Open `http://<host-ip>:8080`.
 1. *Stacks → Add stack → Repository*.
 2. Repository URL: your fork or the project URL. Compose path: `docker-compose.yml`.
 3. Under *Environment variables*, add `POSTGRES_PASSWORD` (and optionally `APP_URL`, `APP_PORT`).
-4. *Deploy the stack*. Portainer builds the images from the repository.
+4. *Deploy the stack*. Portainer builds the image from the repository (or set `BILLFLOW_IMAGE=skrunder/billflow:latest` to pull it instead).
 
-**Option B: Web editor with prebuilt images.** Paste `docker-compose.yml`, set `BACKEND_IMAGE` and `FRONTEND_IMAGE` to published registry images, delete the two `build:` blocks, add the environment variables, and deploy.
+**Option B: Web editor with the prebuilt image.** Paste `docker-compose.yml`, add `BILLFLOW_IMAGE=skrunder/billflow:latest` and the other environment variables, delete the `build:` block of the `app` service, and deploy.
 
 ## Unraid
 
@@ -48,7 +48,7 @@ Install **Docker Compose Manager** from Community Applications (Apps → search 
 1. Open a terminal and fetch the project into appdata:
    ```bash
    mkdir -p /mnt/user/appdata/skr-bill-calendar && cd /mnt/user/appdata/skr-bill-calendar
-   git clone https://github.com/<you>/skr-bill-calendar.git app
+   git clone https://github.com/Skrunder/billflow.git app
    ```
 2. *Docker → Compose → Add New Stack*, name it `skr-bill-calendar`. Under *Advanced*, set the stack directory to `/mnt/user/appdata/skr-bill-calendar/app`.
 3. Edit the stack's **ENV** file:
@@ -59,7 +59,7 @@ Install **Docker Compose Manager** from Community Applications (Apps → search 
    APP_DATA_PATH=/mnt/user/appdata/skr-bill-calendar/data
    BACKUP_PATH=/mnt/user/backups/skr-bill-calendar
    ```
-4. Give the backend data folder to uid 1000:
+4. Give the app data folder to uid 1000:
    ```bash
    mkdir -p /mnt/user/appdata/skr-bill-calendar/data && chown 1000:1000 /mnt/user/appdata/skr-bill-calendar/data
    ```
@@ -79,7 +79,7 @@ Install **Docker Compose Manager** from Community Applications (Apps → search 
    APP_DATA_PATH=/mnt/tank/apps/billcal/data
    BACKUP_PATH=/mnt/tank/apps/billcal/backups
    ```
-   Clone the repo into the Dockge stacks directory so the `./backend` and `./frontend` build contexts exist, or use prebuilt images.
+   Clone the repo into the Dockge stacks directory so the build context exists, or set `BILLFLOW_IMAGE=skrunder/billflow:latest` to use the prebuilt image.
 4. Deploy. ZFS snapshots of the datasets are a good extra safety net.
 
 **Older SCALE releases (k3s-based):** run the stack inside a Linux VM, or use the TrueCharts/Dockge "jailmaker" approach, then follow the standard Linux steps.
@@ -88,7 +88,7 @@ Install **Docker Compose Manager** from Community Applications (Apps → search 
 
 DSM 7.2+ with **Container Manager**:
 1. In *File Station*, create `docker/skr-bill-calendar` and upload or extract the project into it (or `git clone` over SSH).
-2. Create `.env` in that folder from `.env.example` and set `POSTGRES_PASSWORD`. Optionally set `DB_DATA_PATH=/volume1/docker/skr-bill-calendar/postgres`, etc. Over SSH, run `sudo chown 1000:1000` on the backend data folder.
+2. Create `.env` in that folder from `.env.example` and set `POSTGRES_PASSWORD`. Optionally set `DB_DATA_PATH=/volume1/docker/skr-bill-calendar/postgres`, etc. Over SSH, run `sudo chown 1000:1000` on the app data folder.
 3. *Container Manager → Project → Create*. Pick the folder, choose "Use existing docker-compose.yml", and build.
 4. Open `http://<nas-ip>:8080`.
 5. To reach it from outside, use *Control Panel → Login Portal → Advanced → Reverse Proxy* (below).
@@ -99,7 +99,7 @@ Synology reverse proxy: source `HTTPS bills.example.com:443` → destination `HT
 
 ## Reverse proxies
 
-The app needs **one** upstream: `http://<docker-host>:8080`, or `http://frontend:8080` when the proxy shares a Docker network with the stack. After adding TLS, always set:
+The app needs **one** upstream: `http://<docker-host>:8080`, or `http://app:8080` when the proxy shares a Docker network with the stack. After adding TLS, always set:
 
 ```ini
 APP_URL=https://bills.example.com     # enables Secure cookies automatically
@@ -109,13 +109,13 @@ and recreate with `docker compose up -d`. Forwarded headers from private-network
 
 > **Android app sync:** phones upload changes in requests of up to 8 MB. Most proxies allow that, but nginx-based ones default to 1 MB: raise it (`client_max_body_size 8m;`; in Nginx Proxy Manager under *Advanced*) or a first sync with lots of data fails with "413 Request Entity Too Large".
 
-> To expose the app **only** through the proxy, set `APP_BIND_ADDRESS=127.0.0.1` (proxy on the same host), or remove `ports:` and attach the frontend to the proxy's Docker network.
+> To expose the app **only** through the proxy, set `APP_BIND_ADDRESS=127.0.0.1` (proxy on the same host), or remove `ports:` and attach the `app` service to the proxy's Docker network.
 
 ### Nginx Proxy Manager
-*Hosts → Proxy Hosts → Add*: domain `bills.example.com`, scheme `http`, forward host `<docker-host-ip>` (or `frontend` if NPM shares the network), port `8080`. Enable *Block Common Exploits* and *Websockets Support*. Under *SSL*, request a Let's Encrypt certificate with *Force SSL* and *HSTS*.
+*Hosts → Proxy Hosts → Add*: domain `bills.example.com`, scheme `http`, forward host `<docker-host-ip>` (or `app` if NPM shares the network), port `8080`. Enable *Block Common Exploits* and *Websockets Support*. Under *SSL*, request a Let's Encrypt certificate with *Force SSL* and *HSTS*.
 
 ### Traefik (labels)
-Add to the `frontend` service, and remove its `ports:` if Traefik handles everything:
+Add to the `app` service, and remove its `ports:` if Traefik handles everything:
 
 ```yaml
     labels:
@@ -142,7 +142,7 @@ Add a `cloudflared` service to the stack:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     networks: [internal]
 ```
-In the Cloudflare Zero Trust dashboard, set the public hostname `bills.example.com` → service `http://frontend:8080`. Then set `APP_URL=https://bills.example.com`. You can remove the `ports:` mapping entirely. Consider a Cloudflare Access policy for an extra login layer.
+In the Cloudflare Zero Trust dashboard, set the public hostname `bills.example.com` → service `http://app:8080`. Then set `APP_URL=https://bills.example.com`. You can remove the `ports:` mapping entirely. Consider a Cloudflare Access policy for an extra login layer.
 
 ### Plain nginx
 ```nginx
@@ -198,10 +198,10 @@ bills.example.com {
 | `POSTGRES_PASSWORD must be set` | Create `.env` from `.env.example`, or set the variable in your platform's UI. |
 | Backend restarts with `password authentication failed` | The DB volume was created with a different password. Restore the old password, or `docker compose down -v` to wipe (**destroys data**). |
 | Signed out after every refresh, behind a proxy over HTTP | `APP_URL` is `https://…` but you're browsing over `http://` (Secure cookies). Use HTTPS or fix `APP_URL`. |
-| Login works locally but not through the proxy | Make sure the proxy forwards to port **8080** of the frontend (not 4000) and passes the `Host` header. |
+| Login works locally but not through the proxy | Make sure the proxy forwards to port **8080** of the app and passes the `Host` header. |
 | `EACCES /app/data` on Unraid/TrueNAS | `chown 1000:1000` the host folder used for `APP_DATA_PATH`. |
 | Backup sidecar `Permission denied` on Fedora/RHEL | SELinux: the compose file already adds `:z`. For custom paths, keep the `:z` suffix. |
-| Reminders not arriving | Settings → *Send test notification*. Check `docker compose logs backend` for `reminder delivery failed`. Push needs HTTPS + VAPID keys. Email needs SMTP. |
-| Forgot admin password, no SMTP | `docker compose exec backend node dist/cli.js reset-password you@example.com` |
+| Reminders not arriving | Settings → *Send test notification*. Check `docker compose logs app` for `reminder delivery failed`. Push needs HTTPS + VAPID keys. Email needs SMTP. |
+| Forgot admin password, no SMTP | `docker compose exec app node dist/cli.js reset-password you@example.com` |
 | Health status | `docker compose ps`; `curl http://localhost:8080/api/health/ready` |
-| Logs | `docker compose logs -f backend` (JSON lines; pipe through `npx pino-pretty` to read) |
+| Logs | `docker compose logs -f app` (JSON lines; pipe through `npx pino-pretty` to read) |

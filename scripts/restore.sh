@@ -5,9 +5,9 @@
 # Usage:  ./scripts/restore.sh backups/billcalendar-20261007T120000Z.dump [appdata.tar.gz]
 #
 # What it does:
-#   1. stops the frontend and backend (database keeps running)
+#   1. stops the app (database keeps running)
 #   2. drops and recreates the database, then restores the dump into it
-#   3. optionally restores the backend data volume archive
+#   3. optionally restores the app data volume archive
 #   4. starts everything again (pending migrations are applied automatically)
 #
 # THIS REPLACES ALL CURRENT DATA. Take a fresh backup first if unsure.
@@ -43,7 +43,7 @@ if [ "${FORCE:-}" != "1" ]; then
 fi
 
 echo "→ Stopping app containers…"
-$COMPOSE stop frontend backend
+$COMPOSE stop app
 
 echo "→ Ensuring the database container is running…"
 $COMPOSE up -d db
@@ -59,8 +59,8 @@ echo "→ Restoring dump…"
 $COMPOSE exec -T db pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner --role="$DB_USER" --exit-on-error < "$DUMP"
 
 if [ -n "$APPDATA" ]; then
-  echo "→ Restoring backend data volume…"
-  $COMPOSE run --rm --no-deps -T --entrypoint sh backend -c 'find /app/data -mindepth 1 -delete && tar -C /app/data -xzf -' < "$APPDATA"
+  echo "→ Restoring app data volume…"
+  $COMPOSE run --rm --no-deps -T --entrypoint sh app -c 'find /app/data -mindepth 1 -delete && tar -C /app/data -xzf -' < "$APPDATA"
 fi
 
 echo "→ Starting the application…"

@@ -5,7 +5,7 @@ Your data lives in two places:
 | What | Where | Importance |
 |---|---|---|
 | All bills, events, occurrences, history, users, settings | PostgreSQL (`db_data` volume) | **Critical** |
-| Auto-generated JWT secret, future uploads | backend data (`backend_data` volume, `/app/data`) | Small. Losing it only signs everyone out. |
+| Auto-generated JWT secret, future uploads | app data (`backend_data` volume, `/app/data`) | Small. Losing it only signs everyone out. |
 
 Follow the **3-2-1 rule**: three copies, on two kinds of media, with one off-site. Copy `./backups` to your NAS share, cloud storage (rclone, restic, Backblaze B2), or a USB drive.
 
@@ -33,7 +33,7 @@ Equivalent raw commands (useful in Portainer consoles):
 
 ```bash
 docker compose exec -T db pg_dump -U billcalendar -d billcalendar --format=custom > billcalendar.dump
-docker compose exec -T backend tar -C /app/data -czf - . > appdata.tar.gz
+docker compose exec -T app tar -C /app/data -czf - . > appdata.tar.gz
 ```
 
 ## Restore
@@ -46,7 +46,7 @@ docker compose exec -T backend tar -C /app/data -czf - . > appdata.tar.gz
 ```
 
 The script:
-1. stops `frontend` and `backend`
+1. stops `app`
 2. drops and recreates the database
 3. runs `pg_restore` with the dump
 4. optionally restores `/app/data`
@@ -57,7 +57,7 @@ Restoring an older backup into a **newer** app version works, because migrations
 ### Manual restore (no scripts)
 
 ```bash
-docker compose stop frontend backend
+docker compose stop app
 docker compose exec -T db psql -U billcalendar -d postgres -c 'DROP DATABASE IF EXISTS billcalendar;' -c 'CREATE DATABASE billcalendar OWNER billcalendar;'
 docker compose exec -T db pg_restore -U billcalendar -d billcalendar --no-owner --exit-on-error < billcalendar.dump
 docker compose up -d

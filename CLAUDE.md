@@ -5,7 +5,7 @@ Guidance for AI assistants working in this repository.
 ## What this is
 BillFlow (formerly SKR's Bill Calendar): a self-hosted bill and event calendar. npm-workspaces monorepo:
 - `packages/core` (`@skr/core`): shared business rules and API types. **Put anything that must behave identically on server, web and Android here.**
-- `backend`: Express 5 + Prisma 6 + PostgreSQL 16 API (`/api/v1`)
+- `backend`: Express 5 + Prisma 6 + PostgreSQL 16 API (`/api/v1`). In the Docker image it also serves the built web app (`src/web.ts`, `WEB_DIR`): one container, no nginx
 - `frontend`: React 18 PWA (Vite, Tailwind 4, FullCalendar, TanStack Query). Tailwind is configured in `src/index.css` (`@theme`; shared classes like `btn-*`, `input`, `card` in `@layer components`); there is no `tailwind.config`
 - Android app: `frontend/android` (Capacitor 8), the standalone build with native SQLite and phone notifications. Building/installing: `docs/ANDROID.md`; sync milestones: `docs/ANDROID_PLAN.md`.
 
@@ -32,9 +32,9 @@ TEST_DATABASE_URL=postgresql://test:test@localhost:55432/billcal_test npm test -
 npm run typecheck -w backend && npm run typecheck -w frontend
 npm run build -w frontend                      # server-backed web app
 npm run dev:standalone -w frontend             # standalone app on the on-device engine (browser)
-docker compose build && docker compose up -d   # images build from the repo root
+docker compose build && docker compose up -d   # one app image (root Dockerfile) + postgres
 scripts/build-apk.sh [debug]                  # Android APK → dist-apk/ (Docker; signing key: docs/ANDROID.md)
 ```
 
 ## Verification expectations
-After changes: typecheck all workspaces, run the core and backend test suites, and for UI changes build the frontend and check it in a browser (desktop and ~390 px mobile width, light and dark). For Docker or entrypoint changes, build the images and smoke-test the stack. For changes that reach the Android app, build the debug APK and check it in the emulator (`docs/ANDROID.md`, Testing).
+After changes: typecheck all workspaces, run the core and backend test suites, and for UI changes build the frontend and check it in a browser (desktop and ~390 px mobile width, light and dark). For Docker or entrypoint changes, build the image and smoke-test the stack. For changes that reach the Android app, build the debug APK and check it in the emulator (`docs/ANDROID.md`, Testing).

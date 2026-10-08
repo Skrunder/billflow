@@ -137,7 +137,7 @@ Adding a synced table: give it `sync_xid` + both triggers in its migration, add 
 ## 12. Migration strategy
 
 * **Tooling:** Prisma Migrate. Every schema change is a new, immutable folder in `backend/prisma/migrations/` containing plain SQL, committed to git and reviewed like code.
-* **Applying:** the backend container runs `prisma migrate deploy` on every start, before the API listens. It applies only pending migrations, inside a transaction where PostgreSQL allows, and records them in `_prisma_migrations`. A failed migration stops the container (it retries 10× while the DB boots) instead of serving with a mismatched schema. Set `RUN_MIGRATIONS=false` to manage migrations manually.
+* **Applying:** the app container runs `prisma migrate deploy` on every start, before the API listens. It applies only pending migrations, inside a transaction where PostgreSQL allows, and records them in `_prisma_migrations`. A failed migration stops the container (it retries 10× while the DB boots) instead of serving with a mismatched schema. Set `RUN_MIGRATIONS=false` to manage migrations manually.
 * **Authoring (developers):**
   ```bash
   cd backend
@@ -150,5 +150,5 @@ Adding a synced table: give it `sync_xid` + both triggers in its migration, add 
   2. Data backfills go in the same migration as SQL `UPDATE`s so they run exactly once.
   3. Never edit a migration that has shipped.
   4. Destructive changes (only in a major release) are called out in the release notes and preceded by an automatic-backup reminder.
-* **Checking state:** `docker compose exec backend node dist/cli.js migrate-status`.
+* **Checking state:** `docker compose exec app node dist/cli.js migrate-status`.
 * **Rollback:** restore the pre-upgrade backup and run the previous image tag (see [UPGRADING.md](UPGRADING.md)). Migrations are not reversed in place.

@@ -4,6 +4,10 @@
 #   cp .env.example .env      # set POSTGRES_PASSWORD (and APP_URL)
 #   docker compose up -d      # open http://<host>:8080
 #
+# Updating from 1.5.x (two containers before 1.6.0)? Use
+#   docker compose up -d --remove-orphans
+# so the old "frontend" container stops and frees the port.
+#
 # Optional automatic database backups:
 #   docker compose --profile backup up -d
 # ─────────────────────────────────────────────────────────────────────────────
@@ -40,13 +44,12 @@ services:
     networks:
       - internal
 
-  # ── Backend API ───────────────────────────────────────────────────────────
-  backend:
+  # ── BillFlow: API + web app ───────────────────────────────────────────────
+  app:
     <<: *hardening
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    image: ${BACKEND_IMAGE:-skr-bill-calendar-backend:latest}
+    image: ${BILLFLOW_IMAGE:-billflow:latest}
     restart: unless-stopped
     init: true
     depends_on:
@@ -85,32 +88,15 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
       OCCURRENCE_HORIZON_DAYS: ${OCCURRENCE_HORIZON_DAYS:-400}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    ports:
+      - "${APP_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8080}:8080"
     volumes:
-      # Generated secrets and (future) uploaded files.
+      # Generated secrets and (future) uploaded files. The volume keeps its
+      # pre-1.6.0 name so updating keeps the data.
       - ${APP_DATA_PATH:-backend_data}:/app/data
     read_only: true
     tmpfs:
       - /tmp
-    cap_drop:
-      - ALL
-    networks:
-      - internal
-
-  # ── Web frontend (static PWA + /api reverse proxy) ────────────────────────
-  frontend:
-    <<: *hardening
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    image: ${FRONTEND_IMAGE:-skr-bill-calendar-frontend:latest}
-    restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      BACKEND_URL: http://backend:4000
-    ports:
-      - "${APP_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8080}:8080"
     cap_drop:
       - ALL
     networks:

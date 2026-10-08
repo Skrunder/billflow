@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
-# BillFlow — backend API image
-# Build context: the REPOSITORY ROOT (the API depends on packages/core).
-#   docker build -f backend/Dockerfile .
-# Multi-stage: build with dev dependencies, ship only production deps + dist.
-# Runs as the unprivileged "node" user (uid 1000).
+# BillFlow — the app image (API + web app in one container)
+#   docker build -t billflow .
+# The API also serves the built web app (WEB_DIR), so there is no separate web
+# server. Runs as the unprivileged "node" user (uid 1000) on port 8080.
+# PostgreSQL runs in its own container (see docker-compose.yml).
 # ─────────────────────────────────────────────────────────────────────────────
 ARG NODE_VERSION=22-alpine
 
@@ -23,13 +23,24 @@ COPY packages/core/package.json packages/core/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 
-# ── build ────────────────────────────────────────────────────────────────────
-FROM manifests AS build
+# ── API build ────────────────────────────────────────────────────────────────
+FROM manifests AS build-api
 RUN npm ci -w @skr/core -w backend --no-audit --no-fund
 COPY packages/core packages/core
 COPY backend backend
 # "prebuild" compiles @skr/core first; "build" runs prisma generate + tsc.
 RUN npm run build -w backend
+
+# ── web app build ────────────────────────────────────────────────────────────
+FROM manifests AS build-web
+RUN npm ci -w @skr/core -w frontend --no-audit --no-fund
+COPY packages/core packages/core
+COPY frontend frontend
+# "prebuild" compiles @skr/core first. Text files get a .gz twin the API sends
+# to browsers that accept it.
+RUN npm run build -w frontend \
+ && find frontend/dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \
+      -o -name '*.json' -o -name '*.webmanifest' \) -size +1k -exec gzip -9 -k {} +
 
 # ── production dependencies ──────────────────────────────────────────────────
 FROM manifests AS prod-deps
@@ -44,14 +55,16 @@ FROM base AS runtime
 ARG APP_VERSION=
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=4000 \
+    PORT=8080 \
     DATA_DIR=/app/data \
+    WEB_DIR=/app/web \
     APP_VERSION=${APP_VERSION}
 
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/packages/core/package.json ./packages/core/package.json
-COPY --from=build --chown=node:node /app/packages/core/dist ./packages/core/dist
-COPY --from=build --chown=node:node /app/backend/dist ./backend/dist
+COPY --from=build-api --chown=node:node /app/packages/core/package.json ./packages/core/package.json
+COPY --from=build-api --chown=node:node /app/packages/core/dist ./packages/core/dist
+COPY --from=build-api --chown=node:node /app/backend/dist ./backend/dist
+COPY --from=build-web --chown=node:node /app/frontend/dist ./web
 COPY --chown=node:node backend/prisma ./backend/prisma
 COPY --chown=node:node backend/package.json backend/docker-entrypoint.sh ./backend/
 RUN chmod 0755 backend/docker-entrypoint.sh \
@@ -60,16 +73,16 @@ RUN chmod 0755 backend/docker-entrypoint.sh \
 
 WORKDIR /app/backend
 USER node
-EXPOSE 4000
+EXPOSE 8080
 VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:4000/api/health/ready >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/api/health/ready >/dev/null || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--", "./docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
 
-LABEL org.opencontainers.image.title="BillFlow API" \
-      org.opencontainers.image.description="Self-hosted bill & event calendar — backend API" \
+LABEL org.opencontainers.image.title="BillFlow" \
+      org.opencontainers.image.description="Self-hosted bill & event calendar — API and web app" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${APP_VERSION}"
