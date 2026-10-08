@@ -1,6 +1,6 @@
 {
   "name": "skr-bill-calendar-backend",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "private": true,
   "description": "REST API for SKR's Bill Calendar",
   "license": "MIT",
@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
-    "@skr/core": "1.2.1",
+    "@skr/core": "1.3.0",
     "bcryptjs": "3.0.2",
     "cookie-parser": "1.4.7",
     "cors": "2.8.5",

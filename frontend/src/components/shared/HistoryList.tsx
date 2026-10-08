@@ -47,7 +47,7 @@ export function HistoryList({ kind, id }: { kind: 'bills' | 'bill-occurrences' |
         ) as [string, { from: unknown; to: unknown }][];
         return (
           <li key={h.id} className="relative">
-            <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500" aria-hidden />
+            <span className="absolute left-[-21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500" aria-hidden />
             <p className="text-sm font-medium">
               {ACTION_LABEL[h.action] ?? h.action}
               {h.actorType === 'SYSTEM' && <span className="ml-1 text-xs font-normal text-slate-500">(automatic)</span>}

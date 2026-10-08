@@ -30,9 +30,9 @@ function CategoryRow({ category, canEdit, onDelete }: { category: Category; canE
     return (
       <li className="px-4 py-3">
         <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-          <input type="color" aria-label="Colour" className="h-9 w-10 cursor-pointer rounded border border-slate-300 dark:border-slate-700" value={color} onChange={(e) => setColor(e.target.value)} />
+          <input type="color" aria-label="Colour" className="h-9 w-10 cursor-pointer rounded-sm border border-slate-300 dark:border-slate-700" value={color} onChange={(e) => setColor(e.target.value)} />
           <input className="input flex-1" aria-label="Category name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
-          <button className="icon-btn text-emerald-600" aria-label="Save" disabled={save.isPending}>
+          <button className="icon-btn text-emerald-600 dark:text-emerald-400" aria-label="Save" disabled={save.isPending}>
             <Check className="h-4 w-4" />
           </button>
           <button type="button" className="icon-btn" aria-label="Cancel" onClick={() => setEditing(false)}>
@@ -52,7 +52,7 @@ function CategoryRow({ category, canEdit, onDelete }: { category: Category; canE
           <button className="icon-btn" aria-label={`Edit ${category.name}`} onClick={() => setEditing(true)}>
             <Pencil className="h-4 w-4" />
           </button>
-          <button className="icon-btn hover:text-red-600" aria-label={`Delete ${category.name}`} onClick={() => onDelete(category)}>
+          <button className="icon-btn hover:text-red-600 dark:hover:text-red-400" aria-label={`Delete ${category.name}`} onClick={() => onDelete(category)}>
             <Trash2 className="h-4 w-4" />
           </button>
         </>
@@ -95,7 +95,7 @@ function CategoryColumn({ type, title }: { type: CategoryType; title: string }) 
       </div>
       {canEdit && (
         <form onSubmit={add} className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <input type="color" aria-label="New category colour" className="h-9 w-10 cursor-pointer rounded border border-slate-300 dark:border-slate-700" value={color} onChange={(e) => setColor(e.target.value)} />
+          <input type="color" aria-label="New category colour" className="h-9 w-10 cursor-pointer rounded-sm border border-slate-300 dark:border-slate-700" value={color} onChange={(e) => setColor(e.target.value)} />
           <input className="input flex-1" placeholder={`New ${type === 'BILL' ? 'bill' : 'event'} category`} aria-label="New category name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
           <button className="btn-primary" disabled={save.isPending || !name.trim()}>
             <Plus className="h-4 w-4" aria-hidden /> Add

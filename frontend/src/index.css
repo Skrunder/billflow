@@ -1,8 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
 
 @layer base {
+  /* Tailwind 3 defaults that v4 changed: gray-200 borders, pointer cursor on buttons. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  /* v4 trims the date/time field padding; keep them as tall as the other inputs. */
+  input:is([type='date'], [type='time'], [type='datetime-local']) {
+    min-height: 2.5rem;
+  }
   html {
     -webkit-tap-highlight-color: transparent;
     /* Screen insets (notch, status and gesture bars). The Android app injects
@@ -11,30 +42,36 @@
     --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900;
+    @apply outline-hidden ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900;
   }
 }
 
+/* Components sit below utilities, so a utility class on the element (w-full, btn-sm…) always wins. */
 @layer components {
-  .btn {
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-success {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition
       disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700;
+    @apply bg-brand-600 text-white shadow-xs hover:bg-brand-700;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50
+    @apply border border-slate-300 bg-white text-slate-700 shadow-xs hover:bg-slate-50
       dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
   }
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+    @apply text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white shadow-sm hover:bg-red-700;
+    @apply bg-red-600 text-white shadow-xs hover:bg-red-700;
   }
   .btn-success {
-    @apply btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700;
+    @apply bg-emerald-600 text-white shadow-xs hover:bg-emerald-700;
   }
   .btn-sm {
     @apply px-2.5 py-1.5 text-xs;
@@ -44,8 +81,8 @@
       hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200;
   }
   .input {
-    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
-      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs
+      placeholder:text-slate-400 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/30
       disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:disabled:bg-slate-800;
   }
   .label {
@@ -58,7 +95,7 @@
     @apply mt-1 text-xs text-red-600 dark:text-red-400;
   }
   .card {
-    @apply min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+    @apply min-w-0 rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900;
   }
   .card-header {
     @apply flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800;
@@ -66,49 +103,51 @@
   .card-title {
     @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
   }
-  .chip {
+  .chip,
+  .chip-on,
+  .chip-off {
     @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition;
   }
   .chip-on {
-    @apply chip border-brand-600 bg-brand-600 text-white;
+    @apply border-brand-600 bg-brand-600 text-white;
   }
   .chip-off {
-    @apply chip border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900
+    @apply border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900
       dark:text-slate-300 dark:hover:bg-slate-800;
   }
 }
 
 /* ─── FullCalendar theming (light + dark) ─────────────────────────────── */
 .fc {
-  --fc-border-color: theme('colors.slate.200');
-  --fc-page-bg-color: theme('colors.white');
-  --fc-neutral-bg-color: theme('colors.slate.50');
-  --fc-today-bg-color: theme('colors.brand.50');
-  --fc-list-event-hover-bg-color: theme('colors.slate.100');
-  --fc-button-bg-color: theme('colors.white');
-  --fc-button-border-color: theme('colors.slate.300');
-  --fc-button-text-color: theme('colors.slate.700');
-  --fc-button-hover-bg-color: theme('colors.slate.100');
-  --fc-button-hover-border-color: theme('colors.slate.300');
-  --fc-button-active-bg-color: theme('colors.brand.600');
-  --fc-button-active-border-color: theme('colors.brand.600');
+  --fc-border-color: var(--color-slate-200);
+  --fc-page-bg-color: var(--color-white);
+  --fc-neutral-bg-color: var(--color-slate-50);
+  --fc-today-bg-color: var(--color-brand-50);
+  --fc-list-event-hover-bg-color: var(--color-slate-100);
+  --fc-button-bg-color: var(--color-white);
+  --fc-button-border-color: var(--color-slate-300);
+  --fc-button-text-color: var(--color-slate-700);
+  --fc-button-hover-bg-color: var(--color-slate-100);
+  --fc-button-hover-border-color: var(--color-slate-300);
+  --fc-button-active-bg-color: var(--color-brand-600);
+  --fc-button-active-border-color: var(--color-brand-600);
   --fc-event-border-color: transparent;
   font-size: 0.85rem;
 }
 .dark .fc {
-  --fc-border-color: theme('colors.slate.800');
-  --fc-page-bg-color: theme('colors.slate.900');
-  --fc-neutral-bg-color: theme('colors.slate.800');
+  --fc-border-color: var(--color-slate-800);
+  --fc-page-bg-color: var(--color-slate-900);
+  --fc-neutral-bg-color: var(--color-slate-800);
   --fc-today-bg-color: rgb(79 70 229 / 0.15);
-  --fc-list-event-hover-bg-color: theme('colors.slate.800');
-  --fc-button-bg-color: theme('colors.slate.800');
-  --fc-button-border-color: theme('colors.slate.700');
-  --fc-button-text-color: theme('colors.slate.200');
-  --fc-button-hover-bg-color: theme('colors.slate.700');
-  --fc-button-hover-border-color: theme('colors.slate.600');
+  --fc-list-event-hover-bg-color: var(--color-slate-800);
+  --fc-button-bg-color: var(--color-slate-800);
+  --fc-button-border-color: var(--color-slate-700);
+  --fc-button-text-color: var(--color-slate-200);
+  --fc-button-hover-bg-color: var(--color-slate-700);
+  --fc-button-hover-border-color: var(--color-slate-600);
 }
 .fc .fc-button {
-  @apply rounded-lg text-sm font-medium capitalize shadow-sm;
+  @apply rounded-lg text-sm font-medium capitalize shadow-xs;
 }
 .fc .fc-button-primary:not(:disabled).fc-button-active,
 .fc .fc-button-primary:not(:disabled):active {
@@ -128,7 +167,7 @@
   text-decoration: line-through;
 }
 .fc-event.is-overdue {
-  box-shadow: inset 3px 0 0 theme('colors.red.600');
+  box-shadow: inset 3px 0 0 var(--color-red-600);
 }
 .fc .fc-list-day-cushion {
   @apply bg-slate-50 dark:bg-slate-800;

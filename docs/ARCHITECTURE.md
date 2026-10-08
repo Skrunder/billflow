@@ -133,7 +133,7 @@ main.tsx
 
   Server-only account features (sign-in, registration, password reset, email verification, sign out everywhere, account deletion, test notifications) live in `src/data/account.ts`, and push subscriptions in `src/lib/push.ts`, so a standalone install can hide them. `src/api/client.ts` is the fetch wrapper: in-memory access token, single-flight silent refresh on 401, and a 409 multi-tab retry. Mutations invalidate all dependent views (dashboard, calendar, lists, history).
 * **Offline:** the service worker precaches the app shell. Query results are persisted to localStorage per user and wiped on sign-out or account switch. When the server is unreachable at startup, the app opens in read-only *offline* mode with the cached data and reconnects automatically.
-* **UI kit:** Tailwind component classes (`btn-*`, `input`, `card`, `chip`) plus `Modal` (focus trap, Escape, bottom sheet on mobile), `ConfirmDialog`, `Toast`, `Segmented`, `Toggle`, `Field` (label/hint/error wiring).
+* **UI kit:** Tailwind component classes (`btn-*`, `input`, `card`, `chip`; `@layer components` in `src/index.css`, so utilities on an element always override them) plus `Modal` (focus trap, Escape, bottom sheet on mobile), `ConfirmDialog`, `Toast`, `Segmented`, `Toggle`, `Field` (label/hint/error wiring).
 * **Accessibility:** semantic landmarks, skip link, labelled controls, `role=dialog` with `aria-modal`, `role=switch` and `radiogroup`, visible focus rings, live regions for toasts, and colour never the only status signal (badges carry text).
 
 ## 7. Folder structure

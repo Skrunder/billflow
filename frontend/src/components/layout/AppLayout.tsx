@@ -83,7 +83,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen md:flex">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-sm focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>
 
@@ -135,7 +135,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 pb-3 pt-[max(0.75rem,var(--inset-top))] backdrop-blur dark:border-slate-800 dark:bg-slate-900/85 md:px-6">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 pb-3 pt-[max(0.75rem,var(--inset-top))] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/85 md:px-6">
           <Link to="/" className="flex items-center gap-2 md:hidden">
             <img src="/favicon.svg" alt="" className="h-7 w-7" />
             <span className="text-sm font-semibold">Bill Calendar</span>
@@ -170,7 +170,7 @@ export function AppLayout() {
       {/* Mobile bottom navigation */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 pb-[var(--inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 pb-(--inset-bottom) backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/95 md:hidden"
       >
         {MOBILE_NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink

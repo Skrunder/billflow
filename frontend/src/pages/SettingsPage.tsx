@@ -524,7 +524,7 @@ function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; c
           <Download className="h-4 w-4" aria-hidden /> Export all data (JSON)
         </button>
         {canDeleteAccount && (
-          <button type="button" className="btn-secondary text-red-600" onClick={() => setOpen(true)}>
+          <button type="button" className="btn-secondary text-red-600 dark:text-red-400" onClick={() => setOpen(true)}>
             Delete account
           </button>
         )}

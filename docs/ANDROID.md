@@ -8,7 +8,7 @@ your self-hosted server (see *Connecting to your server* below).
 | | |
 |---|---|
 | Package id | `com.skr.billcalendar` (permanent: changing it makes a different app) |
-| Supports | Android 7.0 (API 24) and later; targets API 36 |
+| Supports | Android 7.0 (API 24) and later, with Android System WebView 111+ (Play Store updates it); targets API 36 |
 | Version | `frontend/package.json` `version`; versionCode = major·10000 + minor·100 + patch |
 | Data | `@capacitor-community/sqlite` (own SQLite build), in the app's private storage |
 
@@ -109,7 +109,7 @@ server answered": the address points at something else (often a wrong port).
 
 | Path | What |
 |---|---|
-| `frontend/capacitor.config.ts` | App id/name, plugins. WebView debugging follows Capacitor's default: on for debug builds only |
+| `frontend/capacitor.config.ts` | App id/name, plugins, minimum WebView (older ones get `public/webview-update.html`). WebView debugging follows Capacitor's default: on for debug builds only |
 | `frontend/android/` | Generated Android project, committed. `cap sync` copies the web build in (not committed) |
 | `frontend/src/native/device.tsx` | Platform-neutral hooks: `isNativeApp()`, phone reminders, `saveFile`, navigation |
 | `frontend/src/native/android.ts` | Android startup: native SQLite, reminder scheduler, back button, status bar, file sharing |
@@ -143,7 +143,9 @@ docker exec skr-emu sh -c 'adb forward tcp:9222 localabstract:webview_devtools_r
 emulator-only glitch: with software rendering the dashboard heading sometimes isn't painted on
 screen even though the WebView renders it (visible in a DevTools screenshot).
 
-Checked on Android 16 (API 36) for 1.2.0: connecting to a server through Settings (plain http on
+Checked on Android 16 (API 36) for 1.3.0 (Tailwind CSS 4): every main screen in light and dark,
+upgrade over 1.2.1 (release key), the WebView-too-old page (built with `minWebViewVersion: 999`).
+Checked for 1.2.0: connecting to a server through Settings (plain http on
 the home network, preview, combine), syncing both ways, upgrade from 1.1.0 with data.
 Checked for 1.1.0: native SQLite persistence across restarts, reminder
 scheduling and delivery, tapping a notification, back button, backup through the share sheet,

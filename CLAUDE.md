@@ -6,7 +6,7 @@ Guidance for AI assistants working in this repository.
 SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monorepo:
 - `packages/core` (`@skr/core`): shared business rules and API types. **Put anything that must behave identically on server, web and Android here.**
 - `backend`: Express 5 + Prisma 6 + PostgreSQL 16 API (`/api/v1`)
-- `frontend`: React 18 PWA (Vite, Tailwind, FullCalendar, TanStack Query)
+- `frontend`: React 18 PWA (Vite, Tailwind 4, FullCalendar, TanStack Query). Tailwind is configured in `src/index.css` (`@theme`; shared classes like `btn-*`, `input`, `card` in `@layer components`); there is no `tailwind.config`
 - Android app: `frontend/android` (Capacitor 8), the standalone build with native SQLite and phone notifications. Building/installing: `docs/ANDROID.md`; sync milestones: `docs/ANDROID_PLAN.md`.
 
 ## Non-negotiable rules
@@ -15,7 +15,7 @@ SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monor
 3. **Dates:** calendar days are local `YYYY-MM-DD` (`DATE` columns); instants are UTC. OVERDUE is derived, never stored.
 4. **Money** is a decimal string at boundaries and summed in integer cents (`@skr/core` money helpers).
 5. Migrations are forward-only and additive (see `docs/DATABASE.md`). Never edit a shipped migration.
-6. Pin dependency versions exactly, and don't adopt any release (direct or transitive) that is less than two weeks old. `npm audit --omit=dev` must stay at 0. Root `package.json` `overrides` pin transitive packages for security (`deepmerge-ts`) or the two-week rule (`chai`, `std-env`, `tinyrainbow`); review them whenever the parent package is upgraded. npm may ignore an override for an existing lockfile entry, so verify with `npm ls <pkg>`.
+6. Pin dependency versions exactly, and don't adopt any release (direct or transitive) that is less than two weeks old. `npm audit --omit=dev` must stay at 0. Root `package.json` `overrides` pin transitive packages for security (`deepmerge-ts`) or the two-week rule (`chai`, `std-env`, `tinyrainbow`, `enhanced-resolve`); review them whenever the parent package is upgraded. npm may ignore an override for an existing lockfile entry, so verify with `npm ls <pkg>`.
 7. **Screens never call the server directly.** UI code uses the hooks in `frontend/src/api/hooks.ts`, which go through `DataRepository` (`frontend/src/data/`). New data operations must be added to the interface *and* to every implementation, plus the contract test in `frontend/src/data/remote.test.ts`. Server-only account features belong in `frontend/src/data/account.ts`.
 8. Buttons inside forms must have an explicit `type`. A bare `<button>` submits the form.
 9. **Server and device engines must stay in step.** Any change to how the API behaves (`backend/src/modules`, `backend/src/services`) needs the same change in the on-device engine (`frontend/src/data/local/engine.ts`, plus a new step in `schema.ts` for data-shape changes), with tests on both sides. Shared rules go in `@skr/core`, not into either engine.

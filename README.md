@@ -27,7 +27,7 @@ docker compose up -d
 
 ## Quick start
 
-Requirements: Docker with the Compose plugin, on any Linux host, NAS or VM.
+Requirements: Docker with the Compose plugin, on any Linux host, NAS or VM. Browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+ (2023 or newer).
 
 ```bash
 git clone https://github.com/<you>/skr-bill-calendar.git
@@ -130,7 +130,7 @@ Docker images are built from the **repository root** (`docker build -f backend/D
 
 ## Tech stack
 
-React 18 · TypeScript · Tailwind CSS · FullCalendar · TanStack Query · Vite PWA, on Node.js 22 · Express 5 · Prisma 6 · PostgreSQL 16, served by nginx (unprivileged) in Docker Compose.
+React 18 · TypeScript · Tailwind CSS 4 · FullCalendar · TanStack Query · Vite PWA, on Node.js 22 · Express 5 · Prisma 6 · PostgreSQL 16, served by nginx (unprivileged) in Docker Compose.
 
 ## License
 

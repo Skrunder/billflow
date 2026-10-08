@@ -78,7 +78,7 @@ export function BillDetailPage() {
                     <Archive className="h-4 w-4" aria-hidden /> End series
                   </button>
                 ))}
-              <button className="btn-secondary text-red-600" onClick={() => setConfirm('delete')}>
+              <button className="btn-secondary text-red-600 dark:text-red-400" onClick={() => setConfirm('delete')}>
                 <Trash2 className="h-4 w-4" aria-hidden /> Delete
               </button>
             </>
@@ -96,7 +96,7 @@ export function BillDetailPage() {
             <div>
               <dt className="text-xs text-slate-500">Schedule</dt>
               <dd>{describeRecurrence(bill.recurrence, bill.startDate)}</dd>
-              {bill.recurrence?.rrule && <dd className="mt-0.5 font-mono text-[11px] text-slate-400">{bill.recurrence.rrule}</dd>}
+              {bill.recurrence?.rrule && <dd className="mt-0.5 font-mono text-[11px]/5 text-slate-400">{bill.recurrence.rrule}</dd>}
             </div>
             <div>
               <dt className="text-xs text-slate-500">{bill.isRecurring ? 'Starts' : 'Due'}</dt>

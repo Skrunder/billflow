@@ -111,7 +111,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={clsx(
             'rounded-md px-3 py-1.5 text-xs font-medium transition sm:text-sm',
-            value === o.value ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+            value === o.value ? 'bg-brand-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
           )}
         >
           {o.label}
@@ -149,7 +149,7 @@ export function Toggle({ checked, onChange, label, description, disabled }: {
           checked ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700',
         )}
       >
-        <span className={clsx('inline-block h-5 w-5 rounded-full bg-white shadow transition', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+        <span className={clsx('inline-block h-5 w-5 rounded-full bg-white shadow-sm transition', checked ? 'translate-x-5' : 'translate-x-0.5')} />
       </button>
     </div>
   );

@@ -60,7 +60,7 @@ export function BillsPage() {
             { value: 'all', label: 'All bills' },
           ]}
         />
-        <div className="relative min-w-[10rem] flex-1 sm:max-w-xs">
+        <div className="relative min-w-40 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
           <input className="input pl-8" placeholder="Search bills" aria-label="Search bills" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
