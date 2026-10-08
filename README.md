@@ -1,4 +1,6 @@
-# BillFlow
+<p align="center"><img src="frontend/public/icons/billflow-192.png" alt="BillFlow icon" width="96" height="96"></p>
+
+<h1 align="center">BillFlow</h1>
 
 *Formerly SKR's Bill Calendar.* See [CHANGELOG.md](CHANGELOG.md) for what's new.
 
