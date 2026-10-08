@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useBillOccurrences, useBills, useCategories } from '../api/hooks';
 import { BillOccurrenceDialog } from '../components/bills/BillOccurrenceDialog';
 import { BillOccurrenceRow } from '../components/bills/BillOccurrenceRow';
-import { CategoryDot, EmptyState, PageHeader, Segmented } from '../components/ui/misc';
+import { CategoryDot, EmptyState, EstimateTag, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useSettings } from '../hooks/useSettings';
 import { describeRecurrence, formatDate, formatMoney, todayIn, type BillOccurrenceQuery } from '@skr/core';
@@ -16,7 +16,7 @@ export function BillsPage() {
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as Tab) || 'upcoming';
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ id: string; pay?: boolean } | null>(null);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -81,7 +81,7 @@ export function BillsPage() {
           ) : filteredOcc.length ? (
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredOcc.map((o) => (
-                <BillOccurrenceRow key={o.id} occ={o} onOpen={setOpenId} />
+                <BillOccurrenceRow key={o.id} occ={o} onOpen={(id, pay) => setOpen({ id, pay })} />
               ))}
             </ul>
           ) : (
@@ -110,7 +110,10 @@ export function BillsPage() {
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">{b.category?.name ?? 'Uncategorised'}</p>
                     </div>
-                    <p className="font-semibold tabular-nums">{money(b.amount)}</p>
+                    <p className="shrink-0 font-semibold tabular-nums">
+                      {money(b.amount)}
+                      {b.amountIsEstimate && <EstimateTag />}
+                    </p>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                     <span className="inline-flex items-center gap-1">
@@ -144,7 +147,7 @@ export function BillsPage() {
         </>
       )}
 
-      <BillOccurrenceDialog id={openId} onClose={() => setOpenId(null)} />
+      <BillOccurrenceDialog id={open?.id ?? null} pay={open?.pay} onClose={() => setOpen(null)} />
     </>
   );
 }

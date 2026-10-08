@@ -27,19 +27,32 @@ export interface SummaryRow {
   status: StoredBillStatus;
   amount: string;
   amountPaid: string | null;
+  amountIsEstimate?: boolean;
   /** Local due date YYYY-MM-DD */
   dueDate: string;
 }
 
 /**
+ * The amount to show for a bill occurrence: what was paid once it is
+ * completed (the actual figure), otherwise the amount due, which may be an
+ * estimate.
+ */
+export function billDisplayAmount(o: { status: string; amount: string; amountPaid: string | null; amountIsEstimate?: boolean }) {
+  if (o.status === 'COMPLETED') return { amount: o.amountPaid ?? o.amount, estimated: false };
+  return { amount: o.amount, estimated: Boolean(o.amountIsEstimate) };
+}
+
+/**
  * Totals for a set of bill occurrences. Skipped occurrences are excluded from
- * money totals. Only bills are ever summarised — events are informational.
+ * money totals; completed ones count what was actually paid. Only bills are
+ * ever summarised — events are informational.
  */
 export function summarizeBills(rows: SummaryRow[], today: string): PeriodSummary {
   let total = 0;
   let paid = 0;
   let remaining = 0;
   let overdue = 0;
+  let estimated = false;
   const counts = { total: rows.length, pending: 0, completed: 0, skipped: 0, overdue: 0 };
   for (const r of rows) {
     if (r.status === 'SKIPPED') {
@@ -47,12 +60,15 @@ export function summarizeBills(rows: SummaryRow[], today: string): PeriodSummary
       continue;
     }
     const amount = toCents(r.amount);
-    total += amount;
     if (r.status === 'COMPLETED') {
       counts.completed++;
-      paid += r.amountPaid != null ? toCents(r.amountPaid) : amount;
+      const actual = r.amountPaid != null ? toCents(r.amountPaid) : amount;
+      paid += actual;
+      total += actual;
     } else {
+      total += amount;
       remaining += amount;
+      if (r.amountIsEstimate) estimated = true;
       if (r.dueDate < today) {
         counts.overdue++;
         overdue += amount;
@@ -61,5 +77,5 @@ export function summarizeBills(rows: SummaryRow[], today: string): PeriodSummary
       }
     }
   }
-  return { counts, total: fromCents(total), paid: fromCents(paid), remaining: fromCents(remaining), overdue: fromCents(overdue) };
+  return { counts, total: fromCents(total), paid: fromCents(paid), remaining: fromCents(remaining), overdue: fromCents(overdue), estimated };
 }

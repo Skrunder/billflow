@@ -12,11 +12,11 @@ docker compose up -d
 
 | | |
 |---|---|
-| **Bills** | One-time or recurring (daily / weekly / monthly / yearly / any custom interval such as every 2 weeks, weekly on Mon + Thu, ending on a date or after N times). Amount, category, notes, description, due time, and **manual / auto-pay / scheduled auto-pay** payment methods. |
+| **Bills** | One-time or recurring (daily / weekly / monthly / yearly / any custom interval such as every 2 weeks, weekly on Mon + Thu, ending on a date or after N times). Amount (or an **estimate**, with the actual amount entered when you pay), category, notes, description, due time, and **manual / auto-pay / scheduled auto-pay** payment methods. |
 | **Independent occurrences** | Every due date is its **own database row** with its own status (Pending · Completed · Overdue · Skipped), completion date, amount paid, confirmation number, notes and **audit history**. Paying January never touches February. |
 | **Events** | Birthdays, paydays, meetings, renewals and more, all-day or timed, recurring or not. Statuses: Upcoming · Completed · Cancelled. Events are informational only and **never count toward money totals**. |
 | **Calendar** | Month, week, day and agenda views (FullCalendar), filtered to bills only, events only, or both. Overdue items are flagged and completed ones struck through. |
-| **Dashboard** | Due today, this week and this month, overdue bills, upcoming events, and recently completed bills and events, with paid/remaining totals. |
+| **Dashboard** | Due today, this week and this month, overdue bills, upcoming events, and recently completed bills and events, with paid/remaining totals (paid bills count what was actually paid). |
 | **Reminders** | At the time, 15 min, 1 hour, 1, 3 or 7 days before, or any custom schedule. Delivered in-app, by email (SMTP) or by Web Push to phones and desktops. |
 | **Time zones** | Each user picks a time zone. Instants are stored in UTC and calendar dates stay as the user's local day, so DST is handled correctly. |
 | **Multi-user** | Separate accounts with isolated data, categories and settings. The first account becomes the admin. Registration can be closed. |

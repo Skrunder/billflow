@@ -90,6 +90,7 @@ async function insertBillOccurrences(db: Db, bill: Bill, settings: UserSettings,
         dueDate: fromIsoDate(d),
         dueTime: bill.dueTime,
         amount: bill.amount,
+        amountIsEstimate: bill.amountIsEstimate,
         ...billInstants(d, bill.dueTime, bill, settings),
       })),
       skipDuplicates: true,
@@ -175,6 +176,7 @@ export async function regenerateBill(db: Db, bill: Bill, settings: UserSettings)
           dueDate: bill.startDate,
           dueTime: bill.dueTime,
           amount: bill.amount,
+          amountIsEstimate: bill.amountIsEstimate,
           ...billInstants(start, bill.dueTime, bill, settings),
         },
       });
@@ -193,7 +195,13 @@ export async function regenerateBill(db: Db, bill: Bill, settings: UserSettings)
     const d = toIsoDate(o.originalDueDate);
     await db.billOccurrence.update({
       where: { id: o.id },
-      data: { dueDate: o.originalDueDate, dueTime: bill.dueTime, amount: bill.amount, ...billInstants(d, bill.dueTime, bill, settings) },
+      data: {
+        dueDate: o.originalDueDate,
+        dueTime: bill.dueTime,
+        amount: bill.amount,
+        amountIsEstimate: bill.amountIsEstimate,
+        ...billInstants(d, bill.dueTime, bill, settings),
+      },
     });
   }
   if (!bill.isArchived) {

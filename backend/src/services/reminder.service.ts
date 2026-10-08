@@ -89,7 +89,7 @@ export async function planReminders(now = new Date()): Promise<number> {
     rows.push(
       ...plan('billOccurrenceId', o.id, o.userId, o.dueAt, o.bill.reminderOffsets, now, enabledChannels(s), (offset) => ({
         ...billReminderText(
-          { name: o.bill.name, amount: o.amount.toFixed(2), dueAt: o.dueAt, allDay: !o.dueTime, paymentMethod: o.bill.paymentMethod },
+          { name: o.bill.name, amount: o.amount.toFixed(2), amountIsEstimate: o.amountIsEstimate, dueAt: o.dueAt, allDay: !o.dueTime, paymentMethod: o.bill.paymentMethod },
           offset,
           now,
           reminderLocale(s),

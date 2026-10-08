@@ -32,6 +32,22 @@ describe('sync merge rules', () => {
     expect(mergeRecord(a, { ...b, updatedAt: a.updatedAt })).toMatchObject({ winner: 'existing', record: a });
   });
 
+  it('a field an older version does not send keeps its stored value', () => {
+    const estimated = occ({ amountIsEstimate: true });
+    const fromOldDevice = occ({ notes: 'paid by card', updatedAt: '2026-10-02T00:00:00.000Z' });
+    delete fromOldDevice.amountIsEstimate;
+    const { record, dropped } = mergeOccurrence(estimated, fromOldDevice, BILL_STATUS_FIELDS);
+    expect(record).toMatchObject({ amountIsEstimate: true, notes: 'paid by card' });
+    expect(dropped).toEqual({ notes: { kept: 'paid by card', discarded: null } });
+    expect(mergeRecord({ id: 'b', amountIsEstimate: true, updatedAt: '2026-10-01' }, { id: 'b', updatedAt: '2026-10-02' }).record).toEqual({
+      id: 'b',
+      amountIsEstimate: true,
+      updatedAt: '2026-10-02',
+    });
+    // An older peer's record (no field) still passes validation.
+    expect(syncBillOccurrence.safeParse(fromOldDevice).success).toBe(true);
+  });
+
   it('a later edit elsewhere never undoes a completion', () => {
     const paid = occ({
       status: 'COMPLETED',

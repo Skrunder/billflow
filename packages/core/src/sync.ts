@@ -91,6 +91,8 @@ export const syncBill = z.object({
   ...template,
   name: z.string().trim().min(1).max(120),
   amount: money,
+  // Optional: devices and servers from before 1.4.0 don't send it (see fillMissing).
+  amountIsEstimate: z.boolean().optional(),
   paymentMethod: z.enum(['MANUAL', 'AUTOPAY', 'SCHEDULED_AUTOPAY']),
   scheduledPayDaysBefore: z.number().int().min(0).max(60).nullable(),
   dueTime: timeOfDay.nullable(),
@@ -112,6 +114,7 @@ export const syncBillOccurrence = z.object({
   dueTime: timeOfDay.nullable(),
   dueAt: instant,
   amount: money,
+  amountIsEstimate: z.boolean().optional(),
   status: z.enum(['PENDING', 'COMPLETED', 'SKIPPED']),
   completedAt: instant.nullable(),
   amountPaid: money.nullable(),
@@ -260,8 +263,19 @@ function finish<T extends Record<string, unknown>>(existing: T, incoming: T, rec
   return { record, winner: isExisting ? 'existing' : isIncoming ? 'incoming' : 'merged', dropped };
 }
 
+/**
+ * A field the other side doesn't send (it runs an older version without it)
+ * keeps the stored value instead of being cleared.
+ */
+export function fillMissing<T extends object>(existing: T, incoming: T): T {
+  const out = { ...incoming } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(existing)) if (out[k] === undefined) out[k] = v;
+  return out as T;
+}
+
 /** Last writer wins by updatedAt; on a tie the stored copy stays. */
-export function mergeRecord<T extends { updatedAt: string }>(existing: T, incoming: T): MergeResult<T> {
+export function mergeRecord<T extends { updatedAt: string }>(existing: T, newer: T): MergeResult<T> {
+  const incoming = fillMissing(existing, newer);
   const keys = Object.keys(existing).filter((k) => k !== 'baseUpdatedAt');
   const record = { ...(later(incoming.updatedAt, existing.updatedAt) ? incoming : existing) } as Record<string, unknown>;
   delete record.baseUpdatedAt;
@@ -275,9 +289,10 @@ export function mergeRecord<T extends { updatedAt: string }>(existing: T, incomi
  */
 export function mergeOccurrence<T extends { updatedAt: string; statusChangedAt: string | null; isModified: boolean }>(
   existing: T,
-  incoming: T,
+  sent: T,
   statusFields: readonly string[],
 ): MergeResult<T> {
+  const incoming = fillMissing(existing, sent);
   const keys = Object.keys(existing).filter((k) => k !== 'baseUpdatedAt');
   const newer = later(incoming.updatedAt, existing.updatedAt) ? incoming : existing;
   const record = { ...newer } as Record<string, unknown>;

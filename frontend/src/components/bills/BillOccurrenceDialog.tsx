@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { Check, ExternalLink, Pencil, RotateCcw, SkipForward } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
 import { useBillOccurrence, useBillOccurrenceAction, type BillOccurrenceAction } from '../../api/hooks';
@@ -8,7 +8,7 @@ import { useCanEdit } from '../../hooks/useCanEdit';
 import { useSettings } from '../../hooks/useSettings';
 import { formatClock, formatDate, formatInstant, formatMoney, PAYMENT_METHOD_LABEL } from '@skr/core';
 import { HistoryList } from '../shared/HistoryList';
-import { CategoryDot, Field, Segmented, StatusBadge } from '../ui/misc';
+import { CategoryDot, EstimateTag, Field, Segmented, StatusBadge } from '../ui/misc';
 import { Modal } from '../ui/Modal';
 import { LoadingBlock, Spinner } from '../ui/Spinner';
 import { useToast } from '../ui/Toast';
@@ -18,8 +18,9 @@ type Mode = 'view' | 'complete' | 'edit';
 /**
  * Detail + actions for ONE bill occurrence. Every action here targets only
  * this occurrence; other occurrences of the same recurring bill are untouched.
+ * `pay` opens it on the payment form (used for estimated amounts).
  */
-export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function BillOccurrenceDialog({ id, pay = false, onClose }: { id: string | null; pay?: boolean; onClose: () => void }) {
   const settings = useSettings();
   const canEdit = useCanEdit();
   const toast = useToast();
@@ -36,12 +37,13 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editAmount, setEditAmount] = useState('');
+  const [editEstimate, setEditEstimate] = useState(false);
   const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
     setTab('details');
-    setMode('view');
-  }, [id]);
+    setMode(pay ? 'complete' : 'view');
+  }, [id, pay]);
 
   useEffect(() => {
     if (!occ) return;
@@ -51,8 +53,24 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
     setEditDate(occ.dueDate);
     setEditTime(occ.dueTime ?? '');
     setEditAmount(occ.amount);
+    setEditEstimate(occ.amountIsEstimate);
     setEditNotes(occ.notes ?? '');
   }, [occ, settings.timezone]);
+
+  // Paying an estimate: select the prefilled amount once, so typing replaces it.
+  const paidRef = useRef<HTMLInputElement>(null);
+  const selectedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const key = occ && mode === 'complete' && occ.amountIsEstimate ? occ.id : null;
+    if (!key) {
+      selectedFor.current = null;
+      return;
+    }
+    if (selectedFor.current === key || paidAmount !== occ!.amount) return;
+    selectedFor.current = key;
+    paidRef.current?.focus();
+    paidRef.current?.select();
+  }, [mode, occ, paidAmount]);
 
   const run = (a: BillOccurrenceAction, success: string) =>
     action.mutate(a, {
@@ -120,7 +138,10 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Amount</dt>
-                  <dd className="font-medium tabular-nums">{money(occ.amount)}</dd>
+                  <dd className="font-medium tabular-nums">
+                    {money(occ.amount)}
+                    {occ.amountIsEstimate && <EstimateTag />}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Payment</dt>
@@ -199,8 +220,18 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
                 Mark the <strong>{formatDate(occ.dueDate, settings.locale)}</strong> occurrence as paid. Other occurrences stay as they are.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Amount paid">
-                  {(fid) => <input id={fid} className="input" inputMode="decimal" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />}
+                <Field label={occ.amountIsEstimate ? 'Actual amount' : 'Amount paid'} hint={occ.amountIsEstimate ? `Estimated ${money(occ.amount)}` : undefined}>
+                  {(fid) => (
+                    <input
+                      id={fid}
+                      ref={paidRef}
+                      className="input"
+                      inputMode="decimal"
+                      value={paidAmount}
+                      onChange={(e) => setPaidAmount(e.target.value)}
+                      data-autofocus={occ.amountIsEstimate || undefined}
+                    />
+                  )}
                 </Field>
                 <Field label="Paid on">
                   {(fid) => <input id={fid} type="datetime-local" className="input" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />}
@@ -230,7 +261,13 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
                   {
                     id: occ.id,
                     action: 'update',
-                    body: { dueDate: editDate, dueTime: editTime || null, amount: editAmount.trim(), notes: editNotes.trim() || null },
+                    body: {
+                      dueDate: editDate,
+                      dueTime: editTime || null,
+                      amount: editAmount.trim(),
+                      amountIsEstimate: editEstimate,
+                      notes: editNotes.trim() || null,
+                    },
                   },
                   'Occurrence updated',
                 );
@@ -248,6 +285,10 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
                   {(fid) => <input id={fid} className="input" inputMode="decimal" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />}
                 </Field>
               </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input type="checkbox" checked={editEstimate} onChange={(e) => setEditEstimate(e.target.checked)} />
+                Amount is an estimate
+              </label>
               <Field label="Notes">
                 {(fid) => <textarea id={fid} className="input min-h-[70px]" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />}
               </Field>

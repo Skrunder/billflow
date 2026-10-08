@@ -20,6 +20,7 @@ export function BillForm({ initial, defaultDate, busy, onSubmit, onCancel }: Pro
   const settings = useSettings();
   const [name, setName] = useState(initial?.name ?? '');
   const [amount, setAmount] = useState(initial?.amount ?? '');
+  const [estimate, setEstimate] = useState(initial?.amountIsEstimate ?? false);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
@@ -53,6 +54,7 @@ export function BillForm({ initial, defaultDate, busy, onSubmit, onCancel }: Pro
     onSubmit({
       name: name.trim(),
       amount: amount.trim(),
+      amountIsEstimate: estimate,
       description: description.trim() || null,
       notes: notes.trim() || null,
       categoryId,
@@ -73,7 +75,16 @@ export function BillForm({ initial, defaultDate, busy, onSubmit, onCancel }: Pro
         </Field>
         <Field label={`Amount (${settings.currency})`} error={errors.amount}>
           {(id) => (
-            <input id={id} className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required />
+            <div>
+              <input id={id} className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required />
+              <label className="mt-2 flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input type="checkbox" className="mt-0.5" checked={estimate} onChange={(e) => setEstimate(e.target.checked)} />
+                <span>
+                  Amount is an estimate
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">Enter the actual amount when you mark it paid.</span>
+                </span>
+              </label>
+            </div>
           )}
         </Field>
         <Field label="Category">

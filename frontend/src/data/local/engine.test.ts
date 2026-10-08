@@ -163,6 +163,54 @@ describe('recurring bill occurrences are independent', () => {
   });
 });
 
+describe('estimated amounts (same rules as the server)', () => {
+  it('occurrences copy the estimate; paying records the actual amount', async () => {
+    const b = await repo.createBill(bill({ amount: '80', amountIsEstimate: true }));
+    expect(b).toMatchObject({ amount: '80.00', amountIsEstimate: true });
+    const [nov, dec, jan] = await repo.listBillOccurrences({ billId: b.id });
+    expect([nov, dec, jan].map((o) => o!.amountIsEstimate)).toEqual([true, true, true]);
+    expect((await repo.createBill(bill({ name: 'Rent' }))).amountIsEstimate).toBe(false);
+
+    const paid = await repo.completeBillOccurrence(nov!.id, { amountPaid: '92.15' });
+    expect(paid).toMatchObject({ status: 'COMPLETED', amount: '80.00', amountIsEstimate: true, amountPaid: '92.15' });
+    const cal = (await repo.getCalendar('2026-11-01', '2026-12-31', 'bills')).items.filter((i) => i.templateId === b.id);
+    expect(cal.map((i) => [i.amount, i.amountIsEstimate])).toEqual([
+      ['92.15', false],
+      ['80.00', true],
+    ]);
+
+    // One month set apart; the bill setting then reaches only untouched months.
+    expect(await repo.updateBillOccurrence(dec!.id, { amountIsEstimate: false })).toMatchObject({ amountIsEstimate: false, isModified: true });
+    await repo.updateBill(b.id, bill({ amount: '80', amountIsEstimate: false }));
+    const flags = async () => (await repo.listBillOccurrences({ billId: b.id })).map((o) => o.amountIsEstimate);
+    expect(await flags()).toEqual([true, false, false]);
+    await repo.updateBill(b.id, bill({ amount: '80', amountIsEstimate: true }));
+    expect(await flags()).toEqual([true, false, true]);
+  });
+
+  it('dashboard totals count what was paid and flag estimates still to pay; reminders say "About"', async () => {
+    const w = await repo.createBill(bill({ name: 'Water', amount: '40', amountIsEstimate: true, startDate: '2026-10-08', recurrence: null, reminderOffsets: [60] }));
+    await repo.createBill(bill({ name: 'Phone', amount: '30', startDate: '2026-10-08', recurrence: null }));
+    expect((await repo.getDashboard()).summary.week).toMatchObject({ total: '70.00', remaining: '70.00', estimated: true });
+    expect((await repo.getUpcomingReminders()).map((r) => r.body)).toContain('About $40.00 due Thu, Oct 8');
+
+    const [occ] = await repo.listBillOccurrences({ billId: w.id });
+    await repo.completeBillOccurrence(occ!.id, { amountPaid: '43.70' });
+    expect((await repo.getDashboard()).summary.week).toMatchObject({ total: '73.70', paid: '43.70', remaining: '30.00', estimated: false });
+  });
+
+  it('a phone database or backup from before 1.4.0 (schema 3) has no estimates', async () => {
+    const b = await repo.createBill(bill({ amountIsEstimate: true }));
+    const backup = await repo.createBackup();
+    const strip = <T extends Record<string, unknown>>(rows: T[]) => rows.map(({ amount_is_estimate: _e, ...r }) => r);
+    const old = { ...backup, schemaVersion: 3, tables: { ...backup.tables, bills: strip(backup.tables.bills!), bill_occurrences: strip(backup.tables.bill_occurrences!) } };
+    await fresh();
+    await repo.restoreBackup(JSON.parse(JSON.stringify(old)));
+    expect((await repo.getBill(b.id)).amountIsEstimate).toBe(false);
+    expect((await repo.listBillOccurrences({ billId: b.id })).every((o) => !o.amountIsEstimate)).toBe(true);
+  });
+});
+
 describe('recurring event occurrences are independent', () => {
   it('completing one payday leaves the others upcoming', async () => {
     const e = await repo.createEvent(event());

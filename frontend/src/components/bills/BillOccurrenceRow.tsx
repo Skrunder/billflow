@@ -1,10 +1,10 @@
 import clsx from 'clsx';
 import { Check, Repeat, Zap } from 'lucide-react';
 import { useBillOccurrenceAction } from '../../api/hooks';
-import { type BillOccurrence, formatClock, formatDate, formatMoney } from '@skr/core';
+import { billDisplayAmount, type BillOccurrence, formatClock, formatDate, formatMoney } from '@skr/core';
 import { useCanEdit } from '../../hooks/useCanEdit';
 import { useSettings } from '../../hooks/useSettings';
-import { CategoryDot, StatusBadge } from '../ui/misc';
+import { CategoryDot, EstimateTag, StatusBadge } from '../ui/misc';
 import { useToast } from '../ui/Toast';
 
 export function BillOccurrenceRow({
@@ -13,7 +13,8 @@ export function BillOccurrenceRow({
   showName = true,
 }: {
   occ: BillOccurrence;
-  onOpen: (id: string) => void;
+  /** `pay`: open on the payment form. */
+  onOpen: (id: string, pay?: boolean) => void;
   showName?: boolean;
 }) {
   const settings = useSettings();
@@ -22,7 +23,11 @@ export function BillOccurrenceRow({
   const toast = useToast();
   const actionable = occ.status === 'PENDING' || occ.status === 'OVERDUE';
 
-  const markPaid = () =>
+  const shown = billDisplayAmount(occ);
+
+  const markPaid = () => {
+    // An estimate needs the actual amount, so that opens the payment form instead.
+    if (occ.amountIsEstimate) return onOpen(occ.id, true);
     action.mutate(
       { id: occ.id, action: 'complete' },
       {
@@ -30,6 +35,7 @@ export function BillOccurrenceRow({
         onError: (e) => toast.error((e as Error).message),
       },
     );
+  };
 
   return (
     <li className="flex items-center gap-3 px-4 py-3">
@@ -48,7 +54,10 @@ export function BillOccurrenceRow({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold tabular-nums">{formatMoney(occ.amountPaid ?? occ.amount, settings.currency, settings.locale)}</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {formatMoney(shown.amount, settings.currency, settings.locale)}
+            {shown.estimated && <EstimateTag />}
+          </p>
           <StatusBadge status={occ.status} />
         </div>
       </button>

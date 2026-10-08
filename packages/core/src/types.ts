@@ -89,6 +89,8 @@ export interface Bill {
   description: string | null;
   notes: string | null;
   amount: string;
+  /** The amount is a guess; the real figure is entered when the bill is paid. */
+  amountIsEstimate: boolean;
   category: CategoryLite | null;
   categoryId: string | null;
   paymentMethod: PaymentMethod;
@@ -119,6 +121,7 @@ export interface BillOccurrence {
   dueTime: string | null;
   dueAt: string;
   amount: string;
+  amountIsEstimate: boolean;
   status: BillStatus;
   storedStatus: StoredBillStatus;
   completedAt: string | null;
@@ -188,7 +191,9 @@ export interface CalendarItem {
   start: string;
   end: string | null;
   status: BillStatus | EventStatus;
+  /** Bills: what was paid once completed, otherwise the amount due. */
   amount: string | null;
+  amountIsEstimate: boolean;
   paymentMethod: PaymentMethod | null;
   isRecurring: boolean;
   color: string | null;
@@ -201,6 +206,8 @@ export interface PeriodSummary {
   paid: string;
   remaining: string;
   overdue: string;
+  /** Some of what is still to pay is estimated. */
+  estimated: boolean;
 }
 
 export interface Dashboard {
@@ -260,6 +267,8 @@ export interface BillInput {
   description: string | null;
   notes: string | null;
   amount: string;
+  /** Default false. */
+  amountIsEstimate?: boolean;
   categoryId: string | null;
   paymentMethod: PaymentMethod;
   scheduledPayDaysBefore: number | null;
@@ -321,6 +330,7 @@ export interface UpdateBillOccurrenceBody {
   dueDate?: string;
   dueTime?: string | null;
   amount?: string;
+  amountIsEstimate?: boolean;
   notes?: string | null;
   confirmationNumber?: string | null;
 }

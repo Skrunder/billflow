@@ -59,6 +59,7 @@ One-time tokens for `PASSWORD_RESET` / `EMAIL_VERIFICATION`: `token_hash` unique
 | id, user_id, category_id? | uuid | |
 | name, description?, notes? | text | |
 | amount | numeric(12,2) | CHECK ≥ 0 |
+| amount_is_estimate | bool | the amount is a guess (1.4.0) |
 | payment_method | enum MANUAL / AUTOPAY / SCHEDULED_AUTOPAY | |
 | scheduled_pay_days_before | int? | for scheduled auto-pay |
 | start_date | date | first (or only) due date, a local calendar day |
@@ -84,6 +85,7 @@ One-time tokens for `PASSWORD_RESET` / `EMAIL_VERIFICATION`: `token_hash` unique
 | due_time | text? | |
 | due_at | timestamptz | UTC instant used for reminders |
 | amount | numeric(12,2) | snapshot; editable per occurrence |
+| amount_is_estimate | bool | copied from the bill like `amount`; the actual figure goes in `amount_paid` |
 | status | enum PENDING / COMPLETED / SKIPPED | OVERDUE is derived |
 | completed_at | timestamptz? | CHECK: required when COMPLETED |
 | amount_paid | numeric(12,2)? | |
@@ -113,6 +115,7 @@ Append-only: `user_id`, `actor_type` (USER / SYSTEM), `entity_type` (BILL, BILL_
 * `bill_occurrences.status_changed_at` / `event_occurrences.status_changed_at`: when the status last changed (complete / skip / cancel / reopen / auto-pay). Sync decides status conflicts by it.
 * `devices`: phones signed in through `/auth/native/login` (`session_family_id` links to their refresh sessions; `revoked_at` on sign-out).
 * `sync_batches`: the answer to each processed push (`id` = the device's batch id), so a retried batch isn't applied twice. Purged after 14 days.
+* `bills.amount_is_estimate` / `bill_occurrences.amount_is_estimate` (1.4.0) are optional in sync records: a phone or server from before 1.4.0 leaves them out, and a missing field keeps the stored value on both sides (`fillMissing` in `@skr/core`).
 * New occurrence ids are deterministic (`UUIDv5(templateId + originalDate)`, `@skr/core` `occurrenceId`), so the server and phones create the same id for the same slot. Rows from before 1.2 keep their random ids and are matched by `(template, original date)`.
 
 Adding a synced table: give it `sync_xid` + both triggers in its migration, add a record schema in `packages/core/src/sync.ts`, mappers in `backend/src/services/sync.mappers.ts`, and handle it in pull/push.

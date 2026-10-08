@@ -1,6 +1,7 @@
 import {
   BILL_STATUS_FIELDS,
   EVENT_STATUS_FIELDS,
+  fillMissing,
   mergeOccurrence,
   mergeRecord,
   syncAuditLog,
@@ -109,7 +110,8 @@ export function createSyncStore(db: SqlDriver, run: (sql: string, params?: SqlVa
   }
 
   async function writeRecord(entity: SyncEntity, record: AnyRecord) {
-    const keys = RECORD_KEYS[entity];
+    // A field missing from the record (sent by a server older than the app) keeps the column's value.
+    const keys = RECORD_KEYS[entity].filter((k) => record[k] !== undefined);
     const table = SYNC_TABLE[entity];
     const values = keys.map((k) => (entity === 'auditLogs' && k === 'changes' ? (record.changes == null ? null : JSON.stringify(record.changes)) : toSqlValue(k, record[k])));
     const cols = keys.map(toSnake);
@@ -167,8 +169,8 @@ export function createSyncStore(db: SqlDriver, run: (sql: string, params?: SqlVa
       const clash = await one('SELECT id FROM categories WHERE type = ? AND name = ? AND id <> ?', [incoming.type as string, incoming.name as string, incoming.id]);
       if (clash) await renameLocal('categories', String(clash.id), incoming.id);
     }
-    let result: AnyRecord = incoming as AnyRecord;
     const local = entity === 'auditLogs' ? null : await loadRecord(entity, incoming.id);
+    let result: AnyRecord = local ? fillMissing(local, incoming as AnyRecord) : (incoming as AnyRecord);
     if (local && (await hasPending(entity, incoming.id, pendingAfter))) {
       type Occ = AnyRecord & { updatedAt: string; statusChangedAt: string | null; isModified: boolean };
       result =

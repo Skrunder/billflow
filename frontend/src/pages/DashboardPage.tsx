@@ -43,7 +43,7 @@ function Section({ title, count, action, children }: { title: string; count?: nu
   );
 }
 
-function BillList({ items, onOpen, empty }: { items: BillOccurrence[]; onOpen: (id: string) => void; empty: string }) {
+function BillList({ items, onOpen, empty }: { items: BillOccurrence[]; onOpen: (id: string, pay?: boolean) => void; empty: string }) {
   if (!items.length) return <EmptyState icon={CheckCircle2} title={empty} />;
   return (
     <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -74,11 +74,14 @@ export function DashboardPage() {
   const { user } = useAuth();
   const settings = useSettings();
   const { data, isLoading, error } = useDashboard();
-  const [billId, setBillId] = useState<string | null>(null);
+  const [bill, setBill] = useState<{ id: string; pay?: boolean } | null>(null);
+  const openBill = (id: string, pay?: boolean) => setBill({ id, pay });
   const [eventId, setEventId] = useState<string | null>(null);
   const [period, setPeriod] = useState<'week' | 'month'>('week');
 
   const money = (v: string) => formatMoney(v, settings.currency, settings.locale);
+  // "~" when part of the amount still to pay is estimated.
+  const approx = (p: PeriodSummary, v: string) => `${p.estimated ? '~' : ''}${money(v)}`;
 
   if (isLoading && !data) return <LoadingBlock />;
   if (!data) return <ErrorNotice error={error} />;
@@ -95,15 +98,15 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Due today"
-          value={money(s.today.remaining)}
+          value={approx(s.today, s.today.remaining)}
           sub={`${s.today.counts.pending} bill${s.today.counts.pending === 1 ? '' : 's'} pending`}
           icon={Receipt}
           tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
         />
         <StatCard
           label="This week"
-          value={money(s.week.remaining)}
-          sub={`${money(s.week.paid)} paid of ${money(s.week.total)}`}
+          value={approx(s.week, s.week.remaining)}
+          sub={`${money(s.week.paid)} paid of ${approx(s.week, s.week.total)}`}
           icon={CalendarClock}
           tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
         />
@@ -115,7 +118,7 @@ export function DashboardPage() {
               <div className="mb-1 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress(s.month)}%` }} />
               </div>
-              {money(s.month.paid)} of {money(s.month.total)}
+              {money(s.month.paid)} of {approx(s.month, s.month.total)}
             </div>
           }
           icon={Wallet}
@@ -123,7 +126,7 @@ export function DashboardPage() {
         />
         <StatCard
           label="Overdue"
-          value={money(s.overdue.remaining)}
+          value={approx(s.overdue, s.overdue.remaining)}
           sub={`${s.overdue.counts.overdue} bill${s.overdue.counts.overdue === 1 ? '' : 's'}`}
           icon={AlertTriangle}
           tone="bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
@@ -134,13 +137,13 @@ export function DashboardPage() {
         {data.overdueBills.length > 0 && (
           <div className="lg:col-span-2">
             <Section title="Overdue bills" count={data.overdueBills.length}>
-              <BillList items={data.overdueBills} onOpen={setBillId} empty="Nothing overdue" />
+              <BillList items={data.overdueBills} onOpen={openBill} empty="Nothing overdue" />
             </Section>
           </div>
         )}
 
         <Section title="Bills due today" count={data.billsDueToday.length}>
-          <BillList items={data.billsDueToday} onOpen={setBillId} empty="Nothing due today" />
+          <BillList items={data.billsDueToday} onOpen={openBill} empty="Nothing due today" />
         </Section>
 
         <Section title="Upcoming events" count={data.upcomingEvents.length} action={<Link to="/events" className="text-xs font-medium text-brand-600 hover:underline">All events</Link>}>
@@ -163,12 +166,12 @@ export function DashboardPage() {
               />
             }
           >
-            <BillList items={periodBills} onOpen={setBillId} empty={`No bills this ${period}`} />
+            <BillList items={periodBills} onOpen={openBill} empty={`No bills this ${period}`} />
           </Section>
         </div>
 
         <Section title="Recently completed bills">
-          <BillList items={data.recentlyCompletedBills} onOpen={setBillId} empty="No completed bills yet" />
+          <BillList items={data.recentlyCompletedBills} onOpen={openBill} empty="No completed bills yet" />
         </Section>
         <Section title="Recently completed events">
           {data.recentlyCompletedEvents.length ? (
@@ -179,7 +182,7 @@ export function DashboardPage() {
         </Section>
       </div>
 
-      <BillOccurrenceDialog id={billId} onClose={() => setBillId(null)} />
+      <BillOccurrenceDialog id={bill?.id ?? null} pay={bill?.pay} onClose={() => setBill(null)} />
       <EventOccurrenceDialog id={eventId} onClose={() => setEventId(null)} />
     </>
   );

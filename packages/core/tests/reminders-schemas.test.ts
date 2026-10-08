@@ -27,6 +27,9 @@ describe('reminders', () => {
       title: 'Car Insurance is due tomorrow',
       body: '$96.20 due Fri, Oct 9 at 5:00 PM (auto-pay)',
     });
+    expect(
+      billReminderText({ name: 'Electric', amount: '80', amountIsEstimate: true, dueAt: due, allDay: true, paymentMethod: 'MANUAL' }, 1440, now, s).body,
+    ).toBe('About $80.00 due Fri, Oct 9');
     expect(eventReminderText({ title: 'Dentist', startAt: due, allDay: false, location: 'Main St' }, 0, due, s)).toEqual({
       title: 'Dentist',
       body: 'Fri, Oct 9 at 5:00 PM · Main St',
@@ -37,7 +40,7 @@ describe('reminders', () => {
 describe('schemas', () => {
   it('validates bills like the API always has', () => {
     const ok = billInput.parse({ name: ' Rent ', amount: 1450, startDate: '2026-10-01', recurrence: { frequency: 'MONTHLY' } });
-    expect(ok).toMatchObject({ name: 'Rent', amount: '1450', paymentMethod: 'MANUAL', recurrence: { interval: 1, byWeekday: [] } });
+    expect(ok).toMatchObject({ name: 'Rent', amount: '1450', paymentMethod: 'MANUAL', amountIsEstimate: false, recurrence: { interval: 1, byWeekday: [] } });
     expect(billInput.safeParse({ name: 'X', amount: '1', startDate: '2026-02-30' }).success).toBe(false);
     expect(billInput.safeParse({ name: 'X', amount: '-1', startDate: '2026-02-01' }).success).toBe(false);
     expect(

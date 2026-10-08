@@ -1,5 +1,6 @@
 import {
   addDays,
+  billDisplayAmount,
   billInput,
   billInstants,
   billReminderText,
@@ -304,6 +305,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
       description: b.description,
       notes: b.notes,
       amount: money(b.amount),
+      amountIsEstimate: b.amountIsEstimate,
       categoryId: b.categoryId ?? null,
       paymentMethod: b.paymentMethod,
       scheduledPayDaysBefore: b.paymentMethod === 'SCHEDULED_AUTOPAY' ? (b.scheduledPayDaysBefore ?? 0) : null,
@@ -373,6 +375,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         dueDate: d,
         dueTime: bill.dueTime,
         amount: bill.amount,
+        amountIsEstimate: bill.amountIsEstimate,
         ...billInstantColumns(d, bill.dueTime, bill, s),
         createdAt: stamp,
         updatedAt: stamp,
@@ -440,6 +443,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
           dueDate: bill.startDate,
           dueTime: bill.dueTime,
           amount: bill.amount,
+          amountIsEstimate: bill.amountIsEstimate,
           ...billInstantColumns(bill.startDate, bill.dueTime, bill, s),
           updatedAt: stamp,
         });
@@ -458,6 +462,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         dueDate: o.originalDueDate,
         dueTime: bill.dueTime,
         amount: bill.amount,
+        amountIsEstimate: bill.amountIsEstimate,
         ...billInstantColumns(o.originalDueDate, bill.dueTime, bill, s),
         updatedAt: stamp,
       });
@@ -590,7 +595,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     const stamp = n.toISOString();
 
     const bills = await db.all<SqlRow>(
-      `SELECT o.id, o.bill_id, o.due_at, o.due_time, o.amount, b.name, b.payment_method, b.reminder_offsets
+      `SELECT o.id, o.bill_id, o.due_at, o.due_time, o.amount, o.amount_is_estimate, b.name, b.payment_method, b.reminder_offsets
        FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
        WHERE o.status = 'PENDING' AND o.due_at >= ? AND o.due_at <= ? AND b.reminder_offsets <> '[]'`,
       [windowStart, windowEnd],
@@ -600,7 +605,14 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
       const { due, deliver } = selectDueReminders(at, JSON.parse(String(r.reminder_offsets)) as number[], n);
       for (const offset of due) {
         const text = billReminderText(
-          { name: String(r.name), amount: String(r.amount), dueAt: at, allDay: !r.due_time, paymentMethod: r.payment_method as BillModel['paymentMethod'] },
+          {
+            name: String(r.name),
+            amount: String(r.amount),
+            amountIsEstimate: r.amount_is_estimate === 1,
+            dueAt: at,
+            allDay: !r.due_time,
+            paymentMethod: r.payment_method as BillModel['paymentMethod'],
+          },
           offset,
           n,
           locale,
@@ -657,14 +669,21 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
     };
 
     const bills = await db.all<SqlRow>(
-      `SELECT o.id, o.bill_id, o.due_at, o.due_time, o.amount, b.name, b.payment_method, b.reminder_offsets
+      `SELECT o.id, o.bill_id, o.due_at, o.due_time, o.amount, o.amount_is_estimate, b.name, b.payment_method, b.reminder_offsets
        FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
        WHERE o.status = 'PENDING' AND o.due_at > ? AND o.due_at <= ? AND b.reminder_offsets <> '[]'`,
       [from, occUntil],
     );
     for (const r of bills) {
       const at = new Date(String(r.due_at));
-      const bill = { name: String(r.name), amount: String(r.amount), dueAt: at, allDay: !r.due_time, paymentMethod: r.payment_method as BillModel['paymentMethod'] };
+      const bill = {
+        name: String(r.name),
+        amount: String(r.amount),
+        amountIsEstimate: r.amount_is_estimate === 1,
+        dueAt: at,
+        allDay: !r.due_time,
+        paymentMethod: r.payment_method as BillModel['paymentMethod'],
+      };
       add(String(r.id), at, JSON.parse(String(r.reminder_offsets)) as number[], (offset, sendAt) => billReminderText(bill, offset, sendAt, locale), `/bills/${r.bill_id}?occurrence=${r.id}`);
     }
 
@@ -1045,10 +1064,10 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const updated = await loadBill(id);
         if (scheduleChanged) {
           await regenerateBill(updated, s);
-        } else if ('amount' in changes) {
+        } else if ('amount' in changes || 'amountIsEstimate' in changes) {
           await run(
-            "UPDATE bill_occurrences SET amount = ?, updated_at = ? WHERE bill_id = ? AND status = 'PENDING' AND is_modified = 0 AND due_date >= ?",
-            [updated.amount, now().toISOString(), id, todayInZone(s.timezone, now())],
+            "UPDATE bill_occurrences SET amount = ?, amount_is_estimate = ?, updated_at = ? WHERE bill_id = ? AND status = 'PENDING' AND is_modified = 0 AND due_date >= ?",
+            [updated.amount, updated.amountIsEstimate ? 1 : 0, now().toISOString(), id, todayInZone(s.timezone, now())],
           );
         }
         await audit('BILL', id, 'UPDATED', changes);
@@ -1169,6 +1188,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
             dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
             dueTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullish(),
             amount: z.union([z.string(), z.number()]).optional(),
+            amountIsEstimate: z.boolean().optional(),
             notes: z.string().trim().max(5000).nullish(),
             confirmationNumber: z.string().trim().max(120).nullish(),
           }),
@@ -1181,6 +1201,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         const dueTime = body.dueTime === undefined ? o.dueTime : body.dueTime;
         const patch: Partial<BillOccurrenceModel> = { dueDate, dueTime, ...billInstantColumns(dueDate, dueTime, bill, s), isModified: true };
         if (body.amount !== undefined) patch.amount = money(body.amount);
+        if (body.amountIsEstimate !== undefined) patch.amountIsEstimate = body.amountIsEstimate;
         if (body.notes !== undefined) patch.notes = body.notes || null;
         if (body.confirmationNumber !== undefined) patch.confirmationNumber = body.confirmationNumber || null;
         await transitionBill(o, patch, 'UPDATED');
@@ -1392,6 +1413,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
             [start, end],
           );
           for (const o of await billOccurrencesToDto(rows, t)) {
+            const shown = billDisplayAmount({ ...o, status: o.storedStatus });
             items.push({
               id: `bill:${o.id}`,
               kind: 'bill',
@@ -1403,7 +1425,8 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
               start: o.dueTime ? o.dueAt : o.dueDate,
               end: null,
               status: effectiveBillStatus(o.storedStatus, o.dueDate, t),
-              amount: o.amount,
+              amount: shown.amount,
+              amountIsEstimate: shown.estimated,
               paymentMethod: o.paymentMethod,
               isRecurring: o.isRecurring,
               color: o.category?.color ?? null,
@@ -1429,6 +1452,7 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
               end: o.endAt,
               status: o.status,
               amount: null,
+              amountIsEstimate: false,
               paymentMethod: null,
               isRecurring: o.isRecurring,
               color: o.category?.color ?? null,

@@ -25,6 +25,7 @@ import type { SqlRow, SqlValue } from './driver';
 
 const JSON_FIELDS = new Set(['recurrenceByWeekday', 'reminderOffsets', 'defaultBillReminders', 'defaultEventReminders']);
 const BOOL_FIELDS = new Set([
+  'amountIsEstimate',
   'isArchived',
   'isModified',
   'autoCompleteAutopay',
@@ -86,6 +87,7 @@ export interface BillModel extends RecurrenceColumns {
   description: string | null;
   notes: string | null;
   amount: string;
+  amountIsEstimate: boolean;
   paymentMethod: PaymentMethod;
   scheduledPayDaysBefore: number | null;
   startDate: string;
@@ -105,6 +107,7 @@ export interface BillOccurrenceModel {
   dueTime: string | null;
   dueAt: string;
   amount: string;
+  amountIsEstimate: boolean;
   status: StoredBillStatus;
   completedAt: string | null;
   amountPaid: string | null;
@@ -196,6 +199,7 @@ export function serializeBill(b: BillModel, category: CategoryModel | null): Bil
     description: b.description,
     notes: b.notes,
     amount: b.amount,
+    amountIsEstimate: b.amountIsEstimate,
     category: categoryLite(category),
     categoryId: b.categoryId,
     paymentMethod: b.paymentMethod,
@@ -225,6 +229,7 @@ export function serializeBillOccurrence(o: BillOccurrenceModel, bill: BillModel,
     dueTime: o.dueTime,
     dueAt: o.dueAt,
     amount: o.amount,
+    amountIsEstimate: o.amountIsEstimate,
     status: effectiveBillStatus(o.status, o.dueDate, today),
     storedStatus: o.status,
     completedAt: o.completedAt,

@@ -15,12 +15,16 @@ const eventInclude = { event: { include: { category: categorySelect } } } as con
  * Totals for a date window (rules in @skr/core). Only bill occurrences
  * contribute to money totals — events are informational and never counted.
  */
-function summarise(rows: { status: BillOccurrenceStatus; amount: Prisma.Decimal; amountPaid: Prisma.Decimal | null; dueDate: Date }[], today: string) {
+function summarise(
+  rows: { status: BillOccurrenceStatus; amount: Prisma.Decimal; amountPaid: Prisma.Decimal | null; amountIsEstimate: boolean; dueDate: Date }[],
+  today: string,
+) {
   return summarizeBills(
     rows.map((r) => ({
       status: r.status,
       amount: r.amount.toFixed(2),
       amountPaid: r.amountPaid ? r.amountPaid.toFixed(2) : null,
+      amountIsEstimate: r.amountIsEstimate,
       dueDate: toIsoDate(r.dueDate),
     })),
     today,

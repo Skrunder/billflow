@@ -245,6 +245,12 @@ export const MIGRATIONS: string[] = [
   CREATE TRIGGER settings_sync_update AFTER UPDATE ON settings WHEN EXISTS (SELECT 1 FROM sync_state WHERE key = 'deviceId') AND NOT EXISTS (SELECT 1 FROM sync_state WHERE key = 'applying')
   BEGIN INSERT INTO outbox (entity_type, entity_id, op, created_at) VALUES ('settings', 'settings', 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')); END;
   `,
+
+  // 4 — estimated bill amounts (1.4.0); occurrences copy the flag like the amount
+  `
+  ALTER TABLE bills ADD COLUMN amount_is_estimate INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE bill_occurrences ADD COLUMN amount_is_estimate INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

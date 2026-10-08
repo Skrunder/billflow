@@ -42,12 +42,12 @@ describe.skipIf(!enabled)('phone ⇄ server sync (real engine)', () => {
     secret: { value: string | null };
   }
 
-  async function phone(name: string): Promise<Phone> {
+  async function phone(name: string, transport = http): Promise<Phone> {
     const repo = await createLocalRepository(createSqlJsDriver(SQL), { timezone: 'UTC', displayName: name });
     const secret = { value: null as string | null };
     const client = createSyncClient({
       repo,
-      http,
+      http: transport,
       deviceName: name,
       pushBatchSize: 100,
       secrets: { load: async () => secret.value, save: async (v) => void (secret.value = v), clear: async () => void (secret.value = null) },
@@ -152,6 +152,43 @@ describe.skipIf(!enabled)('phone ⇄ server sync (real engine)', () => {
       expect(await names(p)).toEqual(['Internet', 'Rent (house)']);
     }
     expect((await webOcc(internetId))[0]).toMatchObject({ status: 'COMPLETED', notes: 'autopay next time' });
+  });
+
+  it('estimates and actual amounts travel both ways', async () => {
+    const water = await A.repo.createBill(bill('Water', { amount: '40.00', amountIsEstimate: true, recurrence: null }));
+    await A.client.syncNow();
+    const [onWeb] = (await webOcc(water.id)) as unknown as { id: string; amountIsEstimate: boolean }[];
+    expect(onWeb).toMatchObject({ amountIsEstimate: true });
+
+    await request(app).post(`/api/v1/bill-occurrences/${onWeb!.id}/complete`).set(auth()).send({ amountPaid: '47.10' });
+    await B.client.syncNow();
+    expect(await B.repo.getBillOccurrence(onWeb!.id)).toMatchObject({ status: 'COMPLETED', amount: '40.00', amountPaid: '47.10', amountIsEstimate: true });
+    expect((await B.repo.getBill(water.id)).amountIsEstimate).toBe(true);
+  });
+
+  it('with a server from before 1.4.0 (which drops the field) the phone keeps its estimates', async () => {
+    const strip = (v: unknown): unknown =>
+      Array.isArray(v) ? v.map(strip) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'amountIsEstimate').map(([k, x]) => [k, strip(x)])) : v;
+    const legacy: HttpTransport = async (req) => {
+      const res = await http({ ...req, body: strip(req.body) });
+      return { ...res, data: strip(res.data) };
+    };
+    const D = await phone('Phone D', legacy);
+    await D.client.prepareConnect('localhost', 'sam@example.com', PASSWORD);
+    await D.client.finishConnect('replace');
+    const gas = await D.repo.createBill(bill('Gas', { amount: '55.00', amountIsEstimate: true, recurrence: null }));
+    await D.client.syncNow(); // its own rows come back without the field
+    await request(app).put(`/api/v1/bills/${gas.id}`).set(auth()).send(bill('Gas (house)', { amount: '55.00', recurrence: null }));
+    await D.client.syncNow();
+    expect(D.client.getStatus()).toMatchObject({ phase: 'idle', pending: 0 });
+    expect(await D.repo.getBill(gas.id)).toMatchObject({ name: 'Gas (house)', amountIsEstimate: true });
+    expect((await D.repo.listBillOccurrences({ billId: gas.id })).map((o) => o.amountIsEstimate)).toEqual([true]);
+    await D.client.disconnect();
+
+    // Leave the account as the next tests expect it.
+    for (const b of await webBills()) if (b.name === 'Water' || b.name === 'Gas (house)') await request(app).delete(`/api/v1/bills/${b.id}`).set(auth());
+    await A.client.syncNow();
+    await B.client.syncNow();
   });
 
   it('deletes travel both ways', async () => {

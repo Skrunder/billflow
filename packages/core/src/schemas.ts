@@ -78,6 +78,7 @@ export const billInput = z
     description: optionalText(1000),
     notes: optionalText(5000),
     amount: money,
+    amountIsEstimate: z.boolean().default(false),
     categoryId: z.string().uuid().nullish(),
     paymentMethod: z.enum(['MANUAL', 'AUTOPAY', 'SCHEDULED_AUTOPAY']).default('MANUAL'),
     scheduledPayDaysBefore: z.number().int().min(0).max(60).nullish(),

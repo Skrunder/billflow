@@ -122,6 +122,7 @@ billOccurrencesRouter.patch('/:id', async (req, res) => {
       dueDate: isoDate.optional(),
       dueTime: timeOfDay.nullish(),
       amount: money.optional(),
+      amountIsEstimate: z.boolean().optional(),
       notes: optionalText(5000).optional(),
       confirmationNumber: optionalText(120).optional(),
       amountPaid: money.nullish(),
@@ -143,6 +144,7 @@ billOccurrencesRouter.patch('/:id', async (req, res) => {
     isModified: true,
   };
   if (body.amount !== undefined) data.amount = body.amount;
+  if (body.amountIsEstimate !== undefined) data.amountIsEstimate = body.amountIsEstimate;
   if (body.notes !== undefined) data.notes = body.notes;
   if (body.confirmationNumber !== undefined) data.confirmationNumber = body.confirmationNumber;
   if (body.amountPaid !== undefined) data.amountPaid = body.amountPaid;

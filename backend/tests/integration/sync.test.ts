@@ -358,6 +358,36 @@ describe.skipIf(!enabled)('sync', () => {
       expect((await request(app).get(`/api/v1/bills/${bill.id}`).set(auth(web))).body.category.id).toBe(serverUtilities.id);
     });
 
+    it('estimates sync; a phone from before 1.4.0 (which leaves the field out) keeps them', async () => {
+      const created = await request(app).post('/api/v1/bills').set(auth(web)).send({ name: 'Water', amount: '40', amountIsEstimate: true, startDate: d15 });
+      const id = created.body.id as string;
+      const oid = occurrenceId(id, d15);
+      await pull(phoneA);
+      const bill = row<SyncBill>(phoneA, 'bills', id);
+      const occ = row<SyncBillOccurrence>(phoneA, 'billOccurrences', oid);
+      expect([bill.amountIsEstimate, occ.amountIsEstimate]).toEqual([true, true]);
+
+      const { amountIsEstimate: _b, ...oldBill } = bill;
+      const { amountIsEstimate: _o, ...oldOcc } = occ;
+      const res = await push(phoneA, {
+        bills: [{ ...oldBill, notes: 'meter', updatedAt: later(bill.updatedAt), baseUpdatedAt: bill.updatedAt }],
+        billOccurrences: [{ ...oldOcc, notes: 'read it', isModified: true, updatedAt: later(occ.updatedAt), baseUpdatedAt: occ.updatedAt }],
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ adopt: [], conflicts: 0 });
+      expect((await request(app).get(`/api/v1/bills/${id}`).set(auth(web))).body).toMatchObject({ notes: 'meter', amountIsEstimate: true });
+      expect((await webOccurrence(id))[0]).toMatchObject({ notes: 'read it', amountIsEstimate: true });
+
+      // A current phone pays it with the actual amount.
+      await pull(phoneB);
+      const fresh = row<SyncBillOccurrence>(phoneB, 'billOccurrences', oid);
+      const stamp = later(fresh.updatedAt);
+      const paid = { ...fresh, status: 'COMPLETED' as const, completedAt: stamp, amountPaid: '47.10', statusChangedAt: stamp, updatedAt: stamp, baseUpdatedAt: fresh.updatedAt };
+      expect((await push(phoneB, { billOccurrences: [paid] })).status).toBe(200);
+      expect((await webOccurrence(id))[0]).toMatchObject({ status: 'COMPLETED', amount: '40.00', amountPaid: '47.10', amountIsEstimate: true });
+      await pull(phoneA);
+    });
+
     it('settings from a phone apply on the server (but never the notification switches)', async () => {
       const { changes } = await pull(phoneA);
       const current = (changes('settings')[0] ?? null) as Record<string, unknown> | null;

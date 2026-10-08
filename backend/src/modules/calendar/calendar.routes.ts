@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { badRequest } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import { addDays, daysBetween, fromIsoDate, toIsoDate, todayInZone } from '@skr/core';
+import { addDays, billDisplayAmount, daysBetween, fromIsoDate, toIsoDate, todayInZone } from '@skr/core';
 import { dateRangeQuery, parse } from '../../lib/validate';
 import { currentUser } from '../../middleware/auth';
 import { ensureGenerated } from '../../services/occurrence.service';
@@ -13,6 +13,12 @@ import { getSettings } from '../../services/settings.service';
 export const calendarRouter = Router();
 
 const MAX_RANGE_DAYS = 400;
+
+/** What was paid once completed, otherwise the (possibly estimated) amount due. */
+function calendarAmount(o: { status: string; amount: { toFixed(n: number): string }; amountPaid: { toFixed(n: number): string } | null; amountIsEstimate: boolean }) {
+  const d = billDisplayAmount({ status: o.status, amount: o.amount.toFixed(2), amountPaid: o.amountPaid?.toFixed(2) ?? null, amountIsEstimate: o.amountIsEstimate });
+  return { amount: d.amount, amountIsEstimate: d.estimated };
+}
 
 calendarRouter.get('/', async (req, res) => {
   const me = currentUser(req);
@@ -64,7 +70,7 @@ calendarRouter.get('/', async (req, res) => {
       start: o.dueTime ? o.dueAt.toISOString() : toIsoDate(o.dueDate),
       end: null as string | null,
       status: effectiveBillStatus(o, today),
-      amount: o.amount.toFixed(2),
+      ...calendarAmount(o),
       paymentMethod: o.bill.paymentMethod,
       isRecurring: Boolean(o.bill.recurrenceFrequency),
       color: o.bill.category?.color ?? null,
@@ -82,6 +88,7 @@ calendarRouter.get('/', async (req, res) => {
       end: o.endAt ? o.endAt.toISOString() : null,
       status: o.status,
       amount: null,
+      amountIsEstimate: false,
       paymentMethod: null,
       isRecurring: Boolean(o.event.recurrenceFrequency),
       color: o.event.category?.color ?? null,

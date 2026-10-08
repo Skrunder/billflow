@@ -60,7 +60,7 @@ export default function CalendarPage() {
         const color = i.kind === 'bill' ? (i.status === 'OVERDUE' ? '#dc2626' : (i.color ?? '#4f46e5')) : (i.color ?? '#0ea5e9');
         return {
           id: i.id,
-          title: i.kind === 'bill' ? `${formatMoney(i.amount, settings.currency, settings.locale)} ${i.title}` : i.title,
+          title: i.kind === 'bill' ? `${i.amountIsEstimate ? '~' : ''}${formatMoney(i.amount, settings.currency, settings.locale)} ${i.title}` : i.title,
           start: i.start,
           end: i.end ?? undefined,
           allDay: i.allDay,

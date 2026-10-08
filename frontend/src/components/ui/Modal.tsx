@@ -23,7 +23,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
-    const focusable = panel?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
+    const focusable =
+      panel?.querySelector<HTMLElement>('[data-autofocus]') ?? panel?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
     (focusable ?? panel)?.focus();
 
     const onKey = (e: KeyboardEvent) => {

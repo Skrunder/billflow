@@ -63,6 +63,21 @@ export function EmptyState({ icon: Icon, title, children }: { icon: LucideIcon; 
   );
 }
 
+/** Marks a bill amount that is a guess (the actual figure is entered when it's paid). */
+export function EstimateTag({ className }: { className?: string }) {
+  return (
+    <span
+      className={clsx(
+        'ml-1.5 inline-block rounded-sm bg-amber-100 px-1 align-middle text-[10px]/4 font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+        className,
+      )}
+      title="Estimated amount"
+    >
+      est.
+    </span>
+  );
+}
+
 /** Label + control + optional hint/error, wired up for screen readers. */
 export function Field({
   label,

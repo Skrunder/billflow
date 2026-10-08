@@ -63,14 +63,14 @@ export function whenText(at: Date, allDay: boolean, s: Pick<ReminderLocale, 'tim
 }
 
 export function billReminderText(
-  bill: { name: string; amount: string; dueAt: Date; allDay: boolean; paymentMethod: PaymentMethod },
+  bill: { name: string; amount: string; amountIsEstimate?: boolean; dueAt: Date; allDay: boolean; paymentMethod: PaymentMethod },
   offsetMinutes: number,
   now: Date,
   s: ReminderLocale,
 ): { title: string; body: string } {
   return {
     title: `${bill.name} is due ${relativeLead(minutesUntil(bill.dueAt, now, offsetMinutes))}`,
-    body: `${formatMoney(bill.amount, s.currency, s.locale)} due ${whenText(bill.dueAt, bill.allDay, s)}${
+    body: `${bill.amountIsEstimate ? 'About ' : ''}${formatMoney(bill.amount, s.currency, s.locale)} due ${whenText(bill.dueAt, bill.allDay, s)}${
       bill.paymentMethod !== 'MANUAL' ? ' (auto-pay)' : ''
     }`,
   };

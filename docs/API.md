@@ -73,6 +73,7 @@ Bill body:
 {
   "name": "Electric Bill",
   "amount": "120.50",
+  "amountIsEstimate": false,
   "categoryId": "uuid | null",
   "description": "Acct 1234",
   "notes": null,
@@ -84,14 +85,14 @@ Bill body:
   "reminderOffsets": [1440, 4320]
 }
 ```
-`recurrence: null` creates a one-time bill. A custom interval is any `interval > 1` (for example `{"frequency": "WEEKLY", "interval": 2}`). Reminder offsets are minutes before the due instant (0 = at the time, max 43,200 = 30 days, up to 10). Responses include `recurrence.rrule` (RFC 5545).
+`amountIsEstimate: true` marks the amount as a guess (default `false`); occurrences copy it like the amount, and the actual figure is recorded as `amountPaid` when one is completed. `recurrence: null` creates a one-time bill. A custom interval is any `interval > 1` (for example `{"frequency": "WEEKLY", "interval": 2}`). Reminder offsets are minutes before the due instant (0 = at the time, max 43,200 = 30 days, up to 10). Responses include `recurrence.rrule` (RFC 5545).
 
 ## Bill occurrences `/bill-occurrences`
 | Method | Path | Description |
 |---|---|---|
 | GET | `/?start&end&status=PENDING\|COMPLETED\|SKIPPED\|OVERDUE&billId&categoryId&order&limit` | list; materialises future occurrences on demand |
 | GET | `/:id` | one occurrence |
-| PATCH | `/:id` | `{dueDate?, dueTime?, amount?, notes?, confirmationNumber?, amountPaid?}`; marks `isModified` |
+| PATCH | `/:id` | `{dueDate?, dueTime?, amount?, amountIsEstimate?, notes?, confirmationNumber?, amountPaid?}`; marks `isModified` |
 | POST | `/:id/complete` | `{completedAt?, amountPaid?, confirmationNumber?, notes?}` |
 | POST | `/:id/skip` | `{notes?}` |
 | POST | `/:id/reopen` | back to pending (shown as OVERDUE if past due) |
@@ -103,7 +104,7 @@ Occurrence shape:
   "id": "…", "billId": "…", "name": "Electric Bill", "category": {"id":"…","name":"Utilities","color":"#0ea5e9","icon":null},
   "paymentMethod": "MANUAL", "isRecurring": true,
   "originalDueDate": "2026-02-15", "dueDate": "2026-02-15", "dueTime": null, "dueAt": "2026-02-15T15:00:00.000Z",
-  "amount": "120.50", "status": "PENDING", "storedStatus": "PENDING",
+  "amount": "120.50", "amountIsEstimate": false, "status": "PENDING", "storedStatus": "PENDING",
   "completedAt": null, "amountPaid": null, "confirmationNumber": null, "notes": null,
   "scheduledPayDate": null, "isModified": false, "createdAt": "…", "updatedAt": "…"
 }
@@ -119,8 +120,9 @@ These mirror bills. Event body: `{title, description?, notes?, location?, catego
 { "timezone": "America/Chicago", "today": "2026-10-07",
   "items": [ { "id": "bill:<occId>", "kind": "bill", "occurrenceId": "…", "templateId": "…", "title": "Rent",
                "date": "2026-10-01", "allDay": true, "start": "2026-10-01", "end": null, "status": "OVERDUE",
-               "amount": "1450.00", "paymentMethod": "MANUAL", "isRecurring": true, "color": "#6366f1", "categoryName": "Housing" } ] }
+               "amount": "1450.00", "amountIsEstimate": false, "paymentMethod": "MANUAL", "isRecurring": true, "color": "#6366f1", "categoryName": "Housing" } ] }
 ```
+For bills, `amount` is what was paid once completed, otherwise the amount due (`amountIsEstimate` then says whether it is a guess).
 
 ## Dashboard `/dashboard`
 Returns `today`, `range`, `billsDueToday`, `billsDueThisWeek`, `billsDueThisMonth`, `overdueBills`, `upcomingEvents` (30 days), `recentlyCompletedBills`, `recentlyCompletedEvents`, and `summary.{today,week,month,overdue}` = `{counts, total, paid, remaining, overdue}`. Only bills contribute to money totals.

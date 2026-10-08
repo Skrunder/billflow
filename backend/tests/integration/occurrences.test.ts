@@ -156,6 +156,75 @@ describe.skipIf(!enabled)('API integration', () => {
 
   // ────────────────────────────────────────────────────── events ──
 
+  describe('estimated amounts', () => {
+    let billId = '';
+    type Occ = { id: string; dueDate: string; status: string; amount: string; amountIsEstimate: boolean; amountPaid: string | null };
+    const occs = async () => (await billOccurrences(tokenA, billId)) as unknown as Occ[];
+    const calendarBills = async () => {
+      const res = await request(app).get(`/api/v1/calendar?start=${jan}&end=${mar}&type=bills`).set(auth(tokenA));
+      expect(res.status).toBe(200);
+      return res.body.items as { occurrenceId: string; amount: string; amountIsEstimate: boolean }[];
+    };
+
+    it('a bill can be created with an estimated amount; its occurrences are estimates too', async () => {
+      const res = await request(app)
+        .post('/api/v1/bills')
+        .set(auth(tokenA))
+        .send({ name: 'Gas', amount: '80', amountIsEstimate: true, startDate: jan, recurrence: { frequency: 'MONTHLY', count: 3 } });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ amount: '80.00', amountIsEstimate: true });
+      billId = res.body.id;
+      expect((await occs()).map((o) => o.amountIsEstimate)).toEqual([true, true, true]);
+      expect((await calendarBills()).filter((i) => i.amountIsEstimate)).toHaveLength(3);
+      // Without the field a bill is not an estimate (as before 1.4.0).
+      const plain = await request(app).post('/api/v1/bills').set(auth(await register('dan@example.com'))).send({ name: 'Rent', amount: '900', startDate: jan });
+      expect(plain.body.amountIsEstimate).toBe(false);
+    });
+
+    it('paying records the actual amount; the estimate stays in the record', async () => {
+      const [j] = await occs();
+      const res = await request(app).post(`/api/v1/bill-occurrences/${j!.id}/complete`).set(auth(tokenA)).send({ amountPaid: '92.15' });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: 'COMPLETED', amount: '80.00', amountIsEstimate: true, amountPaid: '92.15' });
+      // The calendar shows what was paid, no longer as an estimate.
+      expect((await calendarBills()).find((i) => i.occurrenceId === j!.id)).toMatchObject({ amount: '92.15', amountIsEstimate: false });
+    });
+
+    it('one month can be set apart; the bill setting then reaches only untouched months', async () => {
+      const [, f] = await occs();
+      const edited = await request(app).patch(`/api/v1/bill-occurrences/${f!.id}`).set(auth(tokenA)).send({ amount: '85.00', amountIsEstimate: false });
+      expect(edited.body).toMatchObject({ amount: '85.00', amountIsEstimate: false, isModified: true });
+
+      const bill = (await request(app).get(`/api/v1/bills/${billId}`).set(auth(tokenA))).body;
+      const put = await request(app)
+        .put(`/api/v1/bills/${billId}`)
+        .set(auth(tokenA))
+        .send({ ...bill, amountIsEstimate: false, recurrence: { frequency: 'MONTHLY', count: 3 } });
+      expect(put.status).toBe(200);
+      expect((await occs()).map((o) => [o.status, o.amountIsEstimate])).toEqual([
+        ['COMPLETED', true], // paid: never changed by template edits
+        ['PENDING', false],
+        ['PENDING', false],
+      ]);
+      await request(app).put(`/api/v1/bills/${billId}`).set(auth(tokenA)).send({ ...bill, amountIsEstimate: true, recurrence: { frequency: 'MONTHLY', count: 3 } });
+      expect((await occs()).map((o) => o.amountIsEstimate)).toEqual([true, false, true]); // February was edited on its own
+    });
+
+    it('dashboard totals count what was paid and flag estimates still to pay', async () => {
+      const token = await register('erin@example.com');
+      const today = DateTime.utc().toISODate()!;
+      const a = await request(app).post('/api/v1/bills').set(auth(token)).send({ name: 'Water', amount: '40', amountIsEstimate: true, startDate: today });
+      await request(app).post('/api/v1/bills').set(auth(token)).send({ name: 'Phone', amount: '30', startDate: today });
+      let dash = (await request(app).get('/api/v1/dashboard').set(auth(token))).body;
+      expect(dash.summary.today).toMatchObject({ total: '70.00', remaining: '70.00', estimated: true });
+
+      const [w] = (await billOccurrences(token, a.body.id)) as { id: string }[];
+      await request(app).post(`/api/v1/bill-occurrences/${w!.id}/complete`).set(auth(token)).send({ amountPaid: '43.70' });
+      dash = (await request(app).get('/api/v1/dashboard').set(auth(token))).body;
+      expect(dash.summary.today).toMatchObject({ total: '73.70', paid: '43.70', remaining: '30.00', estimated: false });
+    });
+  });
+
   describe('recurring event occurrences are independent', () => {
     it('completing one payday leaves the others upcoming', async () => {
       const start = nextMonth.set({ day: 2 }).toISODate()!;

@@ -223,6 +223,8 @@ model Bill {
   description            String?
   notes                  String?
   amount                 Decimal              @db.Decimal(12, 2)
+  /// The amount is a guess; the actual figure is entered when an occurrence is paid.
+  amountIsEstimate       Boolean              @default(false) @map("amount_is_estimate")
   paymentMethod          PaymentMethod        @default(MANUAL) @map("payment_method")
   /// For SCHEDULED_AUTOPAY: payment executes this many days before the due date.
   scheduledPayDaysBefore Int?                 @map("scheduled_pay_days_before")
@@ -272,6 +274,8 @@ model BillOccurrence {
   /// UTC instant derived from dueDate + dueTime (or all-day reminder time).
   dueAt              DateTime             @map("due_at")
   amount             Decimal              @db.Decimal(12, 2)
+  /// Copied from the bill like amount; amountPaid holds the actual figure.
+  amountIsEstimate   Boolean              @default(false) @map("amount_is_estimate")
   status             BillOccurrenceStatus @default(PENDING)
   completedAt        DateTime?            @map("completed_at")
   amountPaid         Decimal?             @map("amount_paid") @db.Decimal(12, 2)

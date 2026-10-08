@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromCents, summarizeBills, toCents } from '../src/money.js';
+import { billDisplayAmount, fromCents, summarizeBills, toCents } from '../src/money.js';
 import { effectiveBillStatus, isBillActionable } from '../src/status.js';
 
 describe('money', () => {
@@ -18,18 +18,29 @@ describe('money', () => {
         { status: 'COMPLETED', amount: '0.10', amountPaid: null, dueDate: '2026-10-01' },
         { status: 'COMPLETED', amount: '50.00', amountPaid: '45.00', dueDate: '2026-10-02' },
         { status: 'PENDING', amount: '0.20', amountPaid: null, dueDate: '2026-10-03' },
-        { status: 'PENDING', amount: '10.00', amountPaid: null, dueDate: '2026-10-20' },
+        { status: 'PENDING', amount: '10.00', amountPaid: null, dueDate: '2026-10-20', amountIsEstimate: true },
         { status: 'SKIPPED', amount: '999.00', amountPaid: null, dueDate: '2026-10-04' },
       ],
       '2026-10-07',
     );
     expect(s).toEqual({
       counts: { total: 5, pending: 1, completed: 2, skipped: 1, overdue: 1 },
-      total: '60.30',
+      total: '55.30', // what was paid, plus what is still due
       paid: '45.10',
       remaining: '10.20',
       overdue: '0.20',
+      estimated: true,
     });
+    expect(summarizeBills([{ status: 'COMPLETED', amount: '80.00', amountPaid: '92.15', dueDate: '2026-10-01', amountIsEstimate: true }], '2026-10-07')).toMatchObject({
+      total: '92.15',
+      estimated: false,
+    });
+  });
+
+  it('shows what was paid once completed, otherwise the (estimated) amount due', () => {
+    expect(billDisplayAmount({ status: 'PENDING', amount: '80.00', amountPaid: null, amountIsEstimate: true })).toEqual({ amount: '80.00', estimated: true });
+    expect(billDisplayAmount({ status: 'COMPLETED', amount: '80.00', amountPaid: '92.15', amountIsEstimate: true })).toEqual({ amount: '92.15', estimated: false });
+    expect(billDisplayAmount({ status: 'SKIPPED', amount: '80.00', amountPaid: null })).toEqual({ amount: '80.00', estimated: false });
   });
 });
 

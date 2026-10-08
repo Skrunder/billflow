@@ -7,7 +7,7 @@ import { BillOccurrenceDialog } from '../components/bills/BillOccurrenceDialog';
 import { BillOccurrenceRow } from '../components/bills/BillOccurrenceRow';
 import { HistoryList } from '../components/shared/HistoryList';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { CategoryDot, EmptyState, ErrorNotice, PageHeader, Segmented } from '../components/ui/misc';
+import { CategoryDot, EmptyState, ErrorNotice, EstimateTag, PageHeader, Segmented } from '../components/ui/misc';
 import { LoadingBlock } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import { useCanEdit } from '../hooks/useCanEdit';
@@ -32,7 +32,7 @@ export function BillDetailPage() {
     Boolean(id),
   );
   const openId = params.get('occurrence');
-  const setOpenId = (o: string | null) => setParams(o ? { occurrence: o } : {}, { replace: true });
+  const setOpenId = (o: string | null, pay?: boolean) => setParams(o ? { occurrence: o, ...(pay ? { pay: '1' } : {}) } : {}, { replace: true });
 
   if (isLoading) return <LoadingBlock />;
   if (!bill) return <ErrorNotice error={error ?? new Error('Bill not found')} />;
@@ -91,7 +91,10 @@ export function BillDetailPage() {
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-xs text-slate-500">Amount</dt>
-              <dd className="text-xl font-semibold tabular-nums">{money(bill.amount)}</dd>
+              <dd className="text-xl font-semibold tabular-nums">
+                {money(bill.amount)}
+                {bill.amountIsEstimate && <EstimateTag className="text-xs/5" />}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Schedule</dt>
@@ -189,7 +192,7 @@ export function BillDetailPage() {
         </section>
       </div>
 
-      <BillOccurrenceDialog id={openId} onClose={() => setOpenId(null)} />
+      <BillOccurrenceDialog id={openId} pay={params.get('pay') === '1'} onClose={() => setOpenId(null)} />
       <ConfirmDialog
         open={confirm === 'archive'}
         title="End this series?"

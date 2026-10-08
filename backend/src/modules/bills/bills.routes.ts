@@ -37,6 +37,7 @@ function columns(b: BillInput, defaults: number[]) {
     description: b.description,
     notes: b.notes,
     amount: b.amount,
+    amountIsEstimate: b.amountIsEstimate,
     categoryId: b.categoryId ?? null,
     paymentMethod: b.paymentMethod,
     scheduledPayDaysBefore: b.paymentMethod === 'SCHEDULED_AUTOPAY' ? (b.scheduledPayDaysBefore ?? 0) : null,
@@ -164,14 +165,14 @@ billsRouter.put('/:id', async (req, res) => {
   const data = columns(body, existing.reminderOffsets);
   const changes = diff(existing as unknown as Record<string, unknown>, data as Record<string, unknown>) as Record<string, unknown>;
   const scheduleChanged = SCHEDULE_FIELDS.some((f) => f in changes);
-  const amountChanged = 'amount' in changes;
+  const amountChanged = 'amount' in changes || 'amountIsEstimate' in changes;
 
   await prisma.$transaction(async (tx) => {
     const updated = await tx.bill.update({ where: { id }, data });
     if (scheduleChanged) {
       await regenerateBill(tx, updated, settings);
     } else if (amountChanged) {
-      // Propagate the new amount only to untouched, upcoming occurrences.
+      // Propagate the new amount (or estimate flag) only to untouched, upcoming occurrences.
       await tx.billOccurrence.updateMany({
         where: {
           billId: id,
@@ -179,7 +180,7 @@ billsRouter.put('/:id', async (req, res) => {
           isModified: false,
           dueDate: { gte: fromIsoDate(todayInZone(settings.timezone)) },
         },
-        data: { amount: updated.amount },
+        data: { amount: updated.amount, amountIsEstimate: updated.amountIsEstimate },
       });
     }
     await audit(tx, {
