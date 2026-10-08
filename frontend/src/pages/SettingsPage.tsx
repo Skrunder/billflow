@@ -472,7 +472,7 @@ function BackupSection() {
             Everything currently in the app is replaced by <strong className="break-all">{pending?.name}</strong>
             {pending?.createdAt && <> (made {new Date(pending.createdAt).toLocaleString()})</>}. This cannot be undone.
           </p>
-          <div className="flex justify-end gap-2">
+          <div className="dialog-actions">
             <button type="button" className="btn-secondary" onClick={() => setPending(null)} disabled={busy}>
               Cancel
             </button>
@@ -538,7 +538,7 @@ function DataSection({ onDeleted, canDeleteAccount }: { onDeleted: () => void; c
           <Field label="Confirm with your password">
             {(id) => <input id={id} type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required />}
           </Field>
-          <div className="flex justify-end gap-2">
+          <div className="dialog-actions">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>
               Cancel
             </button>

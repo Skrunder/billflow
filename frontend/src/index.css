@@ -94,6 +94,14 @@
   .field-error {
     @apply mt-1 text-xs text-red-600 dark:text-red-400;
   }
+  /* Dialog buttons: main action last in the markup. On a phone they stack full
+     width with the main action on top, away from the navigation bar. */
+  .dialog-actions {
+    @apply flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end;
+  }
+  .dialog-actions > * {
+    @apply w-full sm:w-auto;
+  }
   .card {
     @apply min-w-0 rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900;
   }

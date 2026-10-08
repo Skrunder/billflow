@@ -209,7 +209,7 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
               <Field label="Confirmation number (optional)">
                 {(fid) => <input id={fid} className="input" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} maxLength={120} />}
               </Field>
-              <div className="flex justify-end gap-2">
+              <div className="dialog-actions">
                 <button type="button" className="btn-secondary" onClick={() => setMode('view')}>
                   Back
                 </button>
@@ -251,7 +251,7 @@ export function BillOccurrenceDialog({ id, onClose }: { id: string | null; onClo
               <Field label="Notes">
                 {(fid) => <textarea id={fid} className="input min-h-[70px]" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />}
               </Field>
-              <div className="flex justify-end gap-2">
+              <div className="dialog-actions">
                 <button type="button" className="btn-secondary" onClick={() => setMode('view')}>
                   Back
                 </button>

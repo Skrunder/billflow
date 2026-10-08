@@ -3,6 +3,7 @@
  * Run with:  TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/db npm test
  * (the schema is migrated by `prisma migrate deploy` beforehand — see README).
  */
+import crypto from 'node:crypto';
 import { DateTime } from 'luxon';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -275,12 +276,59 @@ describe.skipIf(!enabled)('API integration', () => {
       expect(refreshed.status).toBe(200);
       expect(refreshed.body.accessToken).toBeTruthy();
 
-      // Replaying the old (rotated) token is detected.
-      const replay = await request(app)
-        .post('/api/v1/auth/refresh')
-        .set('Cookie', [refreshCookie.split(';')[0]!, `skr_csrf=${csrf}`])
-        .set('X-CSRF-Token', csrf);
-      expect([401, 409]).toContain(replay.status);
+      // Replaying the old (rotated) token long after is detected.
+      const rt0 = refreshCookie.split(';')[0]!;
+      await prisma.session.updateMany({ where: { tokenHash: sha256(rt0.split('=')[1]!) }, data: { revokedAt: new Date(Date.now() - 120_000) } });
+      const replay = await refresh(rt0, csrf);
+      expect(replay.status).toBe(401);
+      expect((await refresh(cookieOf(refreshed), csrf)).status).toBe(401); // whole family revoked
+    });
+
+    const sha256 = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
+    const cookieOf = (res: request.Response) =>
+      ([] as string[]).concat(res.headers['set-cookie'] ?? []).find((c) => c.startsWith('skr_rt='))!.split(';')[0]!;
+    const refresh = (rt: string, csrf: string) =>
+      request(app).post('/api/v1/auth/refresh').set('Cookie', [rt, `skr_csrf=${csrf}`]).set('X-CSRF-Token', csrf);
+    async function browserLogin() {
+      const login = await request(app).post('/api/v1/auth/login').send({ email: 'alice@example.com', password: 'correct horse battery' });
+      const cookies = ([] as string[]).concat(login.headers['set-cookie'] ?? []);
+      return { rt: cookieOf(login), csrf: cookies.find((c) => c.startsWith('skr_csrf='))!.split(';')[0]!.split('=')[1]! };
+    }
+
+    it('keeps the browser signed in when a refresh response is lost', async () => {
+      const { rt, csrf } = await browserLogin();
+      const lost = await refresh(rt, csrf); // the page reloads before this response arrives
+      expect(lost.status).toBe(200);
+      const retry = await refresh(rt, csrf); // the cookie jar still holds the old token
+      expect(retry.status).toBe(200);
+      expect(retry.body.accessToken).toBeTruthy();
+      // Using the token that reached the browser retires the one that got lost…
+      const next = await refresh(cookieOf(retry), csrf);
+      expect(next.status).toBe(200);
+      const lostRow = await prisma.session.findUnique({ where: { tokenHash: sha256(cookieOf(lost).split('=')[1]!) } });
+      expect(lostRow?.revokedAt).toBeTruthy();
+      // …and the browser carries on.
+      expect((await refresh(cookieOf(next), csrf)).status).toBe(200);
+    });
+
+    it('serves concurrent refreshes from two tabs', async () => {
+      const { rt, csrf } = await browserLogin();
+      const [a, b] = await Promise.all([refresh(rt, csrf), refresh(rt, csrf)]);
+      expect([a.status, b.status]).toEqual([200, 200]);
+      // Responses land in any order; whichever cookie the browser kept works.
+      expect((await refresh(cookieOf(a), csrf)).status).toBe(200);
+      const { rt: rt2, csrf: csrf2 } = await browserLogin();
+      const [c, d] = await Promise.all([refresh(rt2, csrf2), refresh(rt2, csrf2)]);
+      expect([c.status, d.status]).toEqual([200, 200]);
+      expect((await refresh(cookieOf(d), csrf2)).status).toBe(200);
+    });
+
+    it('does not revive a signed-out session', async () => {
+      const { rt, csrf } = await browserLogin();
+      const rotated = await refresh(rt, csrf);
+      await request(app).post('/api/v1/auth/logout').set('Cookie', [cookieOf(rotated), `skr_csrf=${csrf}`]).set('X-CSRF-Token', csrf).expect(204);
+      expect((await refresh(rt, csrf)).status).toBe(401);
+      expect((await refresh(cookieOf(rotated), csrf)).status).toBe(401);
     });
 
     it('rejects wrong passwords with a generic message', async () => {

@@ -112,7 +112,7 @@ export function ServerSyncSection() {
             Your bills and events stay on this phone, but changes stop syncing.
             {status.pending > 0 && <strong> {status.pending} change{status.pending === 1 ? '' : 's'} not yet uploaded will stay only on this phone.</strong>}
           </p>
-          <div className="flex justify-end gap-2">
+          <div className="dialog-actions">
             <button type="button" className="btn-secondary" onClick={() => setConfirmDisconnect(false)}>
               Cancel
             </button>
@@ -203,7 +203,7 @@ function ConnectDialog({ client, onClose }: { client: SyncClient; onClose: () =>
           <Field label="Password">
             {(id) => <input id={id} type="password" className="input" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}
           </Field>
-          <div className="flex justify-end gap-2">
+          <div className="dialog-actions">
             <button type="button" className="btn-secondary" onClick={cancel}>
               Cancel
             </button>

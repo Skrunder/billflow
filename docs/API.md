@@ -5,7 +5,7 @@ Base path: **`/api/v1`**. All request and response bodies are JSON.
 * **Auth:** `Authorization: Bearer <accessToken>` on every endpoint except `/auth/*` and `/health`.
 * **Dates:** calendar days are `"YYYY-MM-DD"` (the user's local day). Instants are ISO-8601 UTC. Times of day are `"HH:mm"` (24 h).
 * **Money:** decimal strings such as `"120.50"`.
-* **Errors:** `{"error": {"code": "VALIDATION_ERROR", "message": "...", "details": [{"path": "amount", "message": "..."}]}}`. Codes: `BAD_REQUEST`, `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `ACCOUNT_LOCKED` (423), `EMAIL_NOT_VERIFIED`, `CSRF_FAILED`, `TOKEN_ROTATED` (409), `RATE_LIMITED` (429), `INTERNAL_ERROR`.
+* **Errors:** `{"error": {"code": "VALIDATION_ERROR", "message": "...", "details": [{"path": "amount", "message": "..."}]}}`. Codes: `BAD_REQUEST`, `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `ACCOUNT_LOCKED` (423), `EMAIL_NOT_VERIFIED`, `CSRF_FAILED`, `RATE_LIMITED` (429), `INTERNAL_ERROR`.
 * **Isolation:** another user's ids return `404`.
 * Every response carries `X-Request-Id`, which also appears in the server logs.
 
@@ -21,7 +21,7 @@ Base path: **`/api/v1`**. All request and response bodies are JSON.
 | GET | `/config` | – | `{registrationOpen, needsSetup, emailVerificationRequired, passwordResetEnabled, pushEnabled, emailNotificationsEnabled}` |
 | POST | `/register` | `{email, password, displayName, timezone?}` | 201 → `{accessToken, expiresIn, user}` + cookies, or `{verificationRequired:true}` |
 | POST | `/login` | `{email, password}` | `{accessToken, expiresIn, user}`; sets `skr_rt` (httpOnly) and `skr_csrf` cookies |
-| POST | `/refresh` | – | requires `X-CSRF-Token` header = `skr_csrf` cookie; rotates the refresh token |
+| POST | `/refresh` | – | requires `X-CSRF-Token` header = `skr_csrf` cookie; rotates the refresh token. Retrying with the previous token within 60 s (lost response, another tab) issues another one; older reuse revokes the session |
 | POST | `/logout` | – | requires CSRF header; revokes the session |
 | POST | `/logout-all` | – | Bearer; revokes every session and access token |
 | POST | `/forgot-password` | `{email}` | always 200 |

@@ -79,9 +79,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        {/* As a bottom sheet, keep the buttons clear of the phone's navigation bar. */}
+        <div className={clsx('overflow-y-auto px-5 pt-4', footer ? 'pb-4' : 'pb-[calc(1rem+var(--inset-bottom))] sm:pb-4')}>{children}</div>
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-3 pb-[max(0.75rem,var(--inset-bottom))] dark:border-slate-800">
+          <div className="dialog-actions border-t border-slate-200 px-5 pt-3 pb-[calc(0.75rem+var(--inset-bottom))] dark:border-slate-800 sm:pb-3">
             {footer}
           </div>
         )}

@@ -70,21 +70,13 @@ async function doFetch(input: string, init: RequestInit): Promise<Response> {
 async function performRefresh(): Promise<AuthResponse | null> {
   const csrf = readCookie('skr_csrf');
   if (!csrf) return null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await doFetch(`${API_BASE}/auth/refresh`, { method: 'POST', headers: { 'X-CSRF-Token': csrf } });
-    if (res.ok) {
-      const data = (await res.json()) as AuthResponse;
-      accessToken = data.accessToken;
-      return data;
-    }
-    // 409 = another tab rotated the token a moment ago; the new cookie is set, retry once.
-    if (res.status === 409 && attempt === 0) {
-      await new Promise((r) => setTimeout(r, 250));
-      continue;
-    }
-    return null;
-  }
-  return null;
+  // A refresh racing another tab, or retried after a lost response, gets a
+  // fresh token too (see consumeRefreshToken on the server).
+  const res = await doFetch(`${API_BASE}/auth/refresh`, { method: 'POST', headers: { 'X-CSRF-Token': csrf } });
+  if (!res.ok) return null;
+  const data = (await res.json()) as AuthResponse;
+  accessToken = data.accessToken;
+  return data;
 }
 
 /** Single-flight refresh. Resolves to null when there is no valid session. */

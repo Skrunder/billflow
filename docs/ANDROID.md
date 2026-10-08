@@ -143,6 +143,8 @@ docker exec skr-emu sh -c 'adb forward tcp:9222 localabstract:webview_devtools_r
 emulator-only glitch: with software rendering the dashboard heading sometimes isn't painted on
 screen even though the WebView renders it (visible in a DevTools screenshot).
 
+Checked for 1.3.1: dialog buttons stack with the main action on top, clear of the 3-button
+navigation bar; release upgrade over 1.3.0.
 Checked on Android 16 (API 36) for 1.3.0 (Tailwind CSS 4): every main screen in light and dark,
 upgrade over 1.2.1 (release key), the WebView-too-old page (built with `minWebViewVersion: 999`).
 Checked for 1.2.0: connecting to a server through Settings (plain http on

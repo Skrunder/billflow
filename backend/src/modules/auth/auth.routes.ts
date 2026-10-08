@@ -71,7 +71,7 @@ authRouter.post('/refresh', requireCsrf, async (req, res) => {
   try {
     res.json(await rotateRefreshToken(res, req.cookies?.[REFRESH_COOKIE], clientInfo(req)));
   } catch (err) {
-    if ((err as { code?: string }).code !== 'TOKEN_ROTATED') clearAuthCookies(res);
+    clearAuthCookies(res);
     throw err;
   }
 });

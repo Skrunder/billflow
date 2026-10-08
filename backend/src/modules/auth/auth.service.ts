@@ -83,6 +83,8 @@ async function createSession(userId: string, info: ClientInfo, familyId: string 
       ipAddress: info.ip?.slice(0, 64),
       userAgent: info.userAgent?.slice(0, 300),
       expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 3600 * 1000),
+      // Set here, not by the database, so refresh can compare it with its own clock.
+      createdAt: new Date(),
     },
   });
   return token;
@@ -198,12 +200,15 @@ export async function login(email: string, password: string, info: ClientInfo): 
 /**
  * Checks a refresh token and retires it, returning the session to continue.
  * A token that was rotated long ago is being replayed (stolen): the whole
- * family is revoked. One rotated moments ago is a benign race:
- *   - 'retry' (browser): the other tab already holds the new cookie, so 409
+ * family is revoked. One rotated moments ago is a benign race, or a refresh
+ * whose response never arrived (page reloaded mid-request, dropped network):
+ *   - 'sibling' (browser): a new token is issued next to the ones issued since.
+ *     Responses can land in any order, so the cookie jar may end up holding
+ *     any of them; the leftovers are retired once one of them is used.
  *   - 'reissue' (phone): the app most likely lost the response to its last
  *     refresh, so whatever was issued since is retired and a new token issued
  */
-async function consumeRefreshToken(token: string | undefined, info: ClientInfo, onRecentReuse: 'retry' | 'reissue') {
+async function consumeRefreshToken(token: string | undefined, info: ClientInfo, onRecentReuse: 'sibling' | 'reissue') {
   if (!token) throw unauthorized('No session');
   const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, include: { user: true } });
   if (!session) throw unauthorized('Session not found');
@@ -224,29 +229,45 @@ async function consumeRefreshToken(token: string | undefined, info: ClientInfo, 
       logger.warn({ userId: session.userId }, 'refresh token reuse detected — session family revoked');
       throw unauthorized('Session revoked');
     }
-    if (onRecentReuse === 'retry') throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
-    // Delete (not just revoke) what was issued since: those tokens never reached the phone,
-    // so anyone presenting one later finds no session at all.
-    const issuedSince = await prisma.session.deleteMany({
-      where: { familyId: session.familyId, createdAt: { gt: session.createdAt } },
-    });
-    if (!issuedSince.count) throw unauthorized('Session revoked');
+    if (onRecentReuse === 'reissue') {
+      // Delete (not just revoke) what was issued since: those tokens never reached the phone,
+      // so anyone presenting one later finds no session at all.
+      const issuedSince = await prisma.session.deleteMany({
+        where: { familyId: session.familyId, createdAt: { gt: session.createdAt } },
+      });
+      if (!issuedSince.count) throw unauthorized('Session revoked');
+    } else {
+      // Only a rotation leaves a live successor; a sign-out revokes the whole family.
+      const successor = await prisma.session.count({
+        where: { familyId: session.familyId, revokedAt: null, createdAt: { gt: session.createdAt } },
+      });
+      if (!successor) throw unauthorized('Session revoked');
+    }
   }
   if (session.expiresAt < new Date()) throw unauthorized('Session expired');
   if (!session.user.isActive) throw unauthorized('Account disabled');
 
   if (!session.revokedAt) {
+    const now = new Date();
     const revoked = await prisma.session.updateMany({
       where: { id: session.id, revokedAt: null },
-      data: { revokedAt: new Date(), lastUsedAt: new Date() },
+      data: { revokedAt: now, lastUsedAt: now },
     });
-    if (!revoked.count && onRecentReuse === 'retry') throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
+    // A live token proves which one the client holds, so siblings left over from
+    // an earlier race are retired. Only older ones: a concurrent request that lost
+    // the update above is issuing a sibling of its own right now.
+    if (revoked.count) {
+      await prisma.session.updateMany({
+        where: { familyId: session.familyId, revokedAt: null, createdAt: { lt: now } },
+        data: { revokedAt: now },
+      });
+    }
   }
   return session;
 }
 
 export async function rotateRefreshToken(res: Response, token: string | undefined, info: ClientInfo) {
-  const session = await consumeRefreshToken(token, info, 'retry');
+  const session = await consumeRefreshToken(token, info, 'sibling');
   return issueTokens(res, session.user, info, session.familyId);
 }
 
@@ -294,9 +315,12 @@ export async function nativeLogout(token: string | undefined) {
   if (session) await revokeDevice(session.familyId);
 }
 
+/** Browser sign-out: the whole family, so no sibling token outlives it. */
 export async function revokeRefreshToken(token: string | undefined) {
   if (!token) return;
-  await prisma.session.updateMany({ where: { tokenHash: sha256(token), revokedAt: null }, data: { revokedAt: new Date() } });
+  const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, select: { familyId: true } });
+  if (!session) return;
+  await prisma.session.updateMany({ where: { familyId: session.familyId, revokedAt: null }, data: { revokedAt: new Date() } });
 }
 
 /** Invalidate every access token and refresh session of a user. */

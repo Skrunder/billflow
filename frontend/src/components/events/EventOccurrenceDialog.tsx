@@ -172,7 +172,7 @@ export function EventOccurrenceDialog({ id, onClose }: { id: string | null; onCl
               <Field label="Notes">
                 {(fid) => <textarea id={fid} className="input min-h-[70px]" value={notes} onChange={(e) => setNotes(e.target.value)} />}
               </Field>
-              <div className="flex justify-end gap-2">
+              <div className="dialog-actions">
                 <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>
                   Back
                 </button>
