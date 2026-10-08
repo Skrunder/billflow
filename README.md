@@ -32,8 +32,8 @@ docker compose up -d
 Requirements: Docker with the Compose plugin, on any Linux host, NAS or VM. Browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+ (2023 or newer).
 
 ```bash
-git clone https://github.com/<you>/skr-bill-calendar.git
-cd skr-bill-calendar
+git clone https://github.com/Skrunder/billflow.git
+cd billflow
 cp .env.example .env
 # Edit .env and set POSTGRES_PASSWORD (e.g. output of: openssl rand -hex 24)
 docker compose up -d
@@ -41,7 +41,29 @@ docker compose up -d
 
 Open **http://&lt;server-ip&gt;:8080**. The first account you create becomes the administrator.
 
+The repository is private, so `git clone` needs your GitHub login (`gh auth login` or a personal access token). If the server has no internet, build the images on another machine and copy them over: `docker compose build`, then `docker save skr-bill-calendar-backend skr-bill-calendar-frontend postgres:16-alpine | gzip > billflow-images.tar.gz`. On the server, run `docker load -i billflow-images.tar.gz` and `docker compose up -d`, with the repo's `docker-compose.yml` and your `.env` next to it.
+
 > The first start builds the images, which takes a few minutes. Later starts are instant.
+
+## Using BillFlow
+
+1. **Create your account.** The first account becomes the administrator. To stop strangers signing up afterwards, set `ALLOW_REGISTRATION=false` in `.env` and run `docker compose up -d`.
+2. **Check Settings.** Under *Region & time*, set your time zone and currency. Under *Reminders*, choose the default reminders for new bills and events.
+3. **Add bills.** Use **+** (or *Bills → New bill*). Give it a name, an amount and a due date, and turn on *Repeats* for recurring bills (monthly rent, a phone bill every 2 weeks, and so on). If you don't know the exact amount yet, tick **Amount is an estimate**.
+4. **Pay a bill.** Tap the ✓ (**Mark paid**) on a bill's row, or open the occurrence and choose **Mark paid**. Enter the date and amount paid (for an estimate, enter the actual amount here), plus an optional confirmation number, then **Confirm payment**. Each month is its own record: paying, **Skip**ping or **Reopen**ing one never changes another. *Edit this occurrence* changes a single month without touching the rest.
+5. **Add events.** Under *Events* you can add birthdays, paydays, appointments and renewals. Events show on the calendar and dashboard but never count toward money totals.
+6. **Keep track.** The *Dashboard* shows what's due today, this week and this month, overdue bills and what's left to pay. The *Calendar* has month, week, day and list views, and can show bills, events or both. *Categories* lets you colour-code and group bills.
+7. **Get reminders.** Due reminders appear under the bell icon. For email, configure SMTP in `.env`. For phone and desktop notifications, set up the push keys (`generate-vapid-keys`, see [Administration](#administration)), serve the app over HTTPS, then choose **Enable push on this device** in *Settings → Notifications*.
+8. **Install it as an app.** In Chrome or Edge, use *Install app*. On iPhone or iPad, use *Share → Add to Home Screen*. The installed app opens like a native one and keeps showing your data when offline.
+9. **Back up.** Turn on the backup sidecar (below) for the server. *Settings → Your data → Export all data (JSON)* downloads a copy of your own data at any time.
+
+### Android app
+
+The Android app works on its own, with no server needed. It keeps your data on the phone and sends reminders as Android notifications. Build it with `scripts/build-apk.sh` (see [docs/ANDROID.md](docs/ANDROID.md)), copy `dist-apk/billflow-<version>.apk` to the phone and open it to install. To update, install the newer APK over the old one; your data is kept.
+
+To share data with your server and the web app, open *Settings → Server sync → Connect to server*, enter your server's address and sign in. If both sides already have data, choose **Combine both** or **Use the server's data**. Changes then sync both ways, and the app keeps working offline. Without a server, use *Settings → Backup* to save a backup file somewhere safe, such as Google Drive.
+
+## Self-hosting extras
 
 ### Enable automatic daily backups (recommended)
 
