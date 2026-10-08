@@ -113,6 +113,8 @@ export interface BillOccurrenceModel {
   scheduledPayDate: string | null;
   autopayAt: string | null;
   isModified: boolean;
+  /** When the status last changed; sync decides status conflicts by it. */
+  statusChangedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,6 +150,7 @@ export interface EventOccurrenceModel {
   cancelledAt: string | null;
   notes: string | null;
   isModified: boolean;
+  statusChangedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

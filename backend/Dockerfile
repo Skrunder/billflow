@@ -40,7 +40,8 @@ RUN npm ci -w backend --omit=dev --no-audit --no-fund \
 
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM base AS runtime
-ARG APP_VERSION=1.0.0
+# Optional override; the version normally comes from package.json.
+ARG APP_VERSION=
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=4000 \

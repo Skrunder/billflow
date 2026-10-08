@@ -107,6 +107,16 @@ Web Push endpoints per device: `endpoint` unique, `p256dh`, `auth`, `user_agent`
 ### `audit_logs`
 Append-only: `user_id`, `actor_type` (USER / SYSTEM), `entity_type` (BILL, BILL_OCCURRENCE, EVENT, EVENT_OCCURRENCE, CATEGORY, SETTINGS, USER, SESSION), `entity_id`, `action` (CREATED, UPDATED, COMPLETED, SKIPPED, CANCELLED, REOPENED, AUTOPAY_COMPLETED, ARCHIVED, DELETED, LOGIN, …), `changes` (JSON field diff), `metadata` (IP, user agent), `created_at`. There is deliberately **no FK to the audited entity**, so history survives deletion.
 
+### Sync tables (Android app)
+* Every synced table (`user_settings`, `categories`, `bills`, `bill_occurrences`, `events`, `event_occurrences`, `audit_logs`) has `sync_xid BIGINT`, set by the `skr_stamp_sync_xid` trigger to the writing transaction's id on every insert/update.
+* `sync_tombstones`: `user_id`, `entity_type`, `entity_id`, `sync_xid`, `deleted_at`, written by the `skr_record_tombstone` AFTER DELETE trigger (also for cascaded deletes). Purged after 180 days.
+* `bill_occurrences.status_changed_at` / `event_occurrences.status_changed_at`: when the status last changed (complete / skip / cancel / reopen / auto-pay). Sync decides status conflicts by it.
+* `devices`: phones signed in through `/auth/native/login` (`session_family_id` links to their refresh sessions; `revoked_at` on sign-out).
+* `sync_batches`: the answer to each processed push (`id` = the device's batch id), so a retried batch isn't applied twice. Purged after 14 days.
+* New occurrence ids are deterministic (`UUIDv5(templateId + originalDate)`, `@skr/core` `occurrenceId`), so the server and phones create the same id for the same slot. Rows from before 1.2 keep their random ids and are matched by `(template, original date)`.
+
+Adding a synced table: give it `sync_xid` + both triggers in its migration, add a record schema in `packages/core/src/sync.ts`, mappers in `backend/src/services/sync.mappers.ts`, and handle it in pull/push.
+
 ## Integrity guarantees
 
 | Guarantee | Enforced by |

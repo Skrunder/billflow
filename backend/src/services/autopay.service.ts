@@ -25,7 +25,7 @@ export async function processAutopay(now = new Date()): Promise<number> {
     const res = await prisma.$transaction(async (tx) => {
       const r = await tx.billOccurrence.updateMany({
         where: { id: o.id, status: 'PENDING' },
-        data: { status: 'COMPLETED', completedAt: o.autopayAt ?? now, amountPaid: o.amount },
+        data: { status: 'COMPLETED', completedAt: o.autopayAt ?? now, amountPaid: o.amount, statusChangedAt: now },
       });
       if (r.count) {
         await audit(tx, {

@@ -5,6 +5,7 @@ import { ApiError } from '../../api/client';
 import { createRemoteRepository } from '../remote';
 import { createLocalRepository, type LocalRepository } from './engine';
 import { createSqlJsDriver } from './sqljs-driver';
+import { MIGRATIONS } from './schema';
 
 /**
  * The local engine must give the same guarantees as the server
@@ -245,6 +246,55 @@ describe('background maintenance', () => {
     expect(await repo.getUnreadNotificationCount()).toBe(1);
     await repo.markAllNotificationsRead();
     expect(await repo.getUnreadNotificationCount()).toBe(0);
+  });
+});
+
+describe('sync bookkeeping', () => {
+  it('stamps statusChangedAt on status changes only, like the server', async () => {
+    const b = await repo.createBill(bill());
+    const [jan, feb] = await repo.listBillOccurrences({ billId: b.id });
+    const row = async (id: string) => (await repo.createBackup()).tables.bill_occurrences!.find((r) => r.id === id)!;
+    expect((await row(jan!.id)).status_changed_at).toBeNull();
+
+    clock = new Date('2026-10-08T12:00:00.000Z');
+    await repo.updateBillOccurrence(jan!.id, { notes: 'edited' });
+    expect((await row(jan!.id)).status_changed_at).toBeNull();
+
+    clock = new Date('2026-10-09T12:00:00.000Z');
+    await repo.skipBillOccurrence(feb!.id);
+    expect((await row(feb!.id)).status_changed_at).toBe('2026-10-09T12:00:00.000Z');
+    clock = new Date('2026-10-10T12:00:00.000Z');
+    await repo.reopenBillOccurrence(feb!.id);
+    expect((await row(feb!.id)).status_changed_at).toBe('2026-10-10T12:00:00.000Z');
+  });
+});
+
+describe('schema upgrades', () => {
+  it('a phone database from 1.1 (schema 1) upgrades, deriving status times for finished occurrences', async () => {
+    const d = createSqlJsDriver(SQL);
+    await d.exec(MIGRATIONS[0]!);
+    await d.run("INSERT INTO meta (key, value) VALUES ('schema_version', '1')");
+    await d.run("INSERT INTO profile (id, display_name, created_at) VALUES ('p', 'Pat', '2026-09-01T00:00:00.000Z')");
+    await d.run("INSERT INTO settings (id, timezone, updated_at) VALUES (1, 'America/Chicago', '2026-09-01T00:00:00.000Z')");
+    await d.run(`INSERT INTO bills (id, name, amount, start_date, created_at, updated_at) VALUES ('b', 'Rent', '1500.00', '2026-09-01', 'x', 'x')`);
+    await d.run(`INSERT INTO bill_occurrences (id, bill_id, original_due_date, due_date, due_at, amount, status, completed_at, created_at, updated_at)
+                 VALUES ('o1', 'b', '2026-09-01', '2026-09-01', '2026-09-01T14:00:00.000Z', '1500.00', 'COMPLETED', '2026-09-01T15:00:00.000Z', 'x', 'x'),
+                        ('o2', 'b', '2026-10-01', '2026-10-01', '2026-10-01T14:00:00.000Z', '1500.00', 'PENDING', NULL, 'x', 'x')`);
+    repo = await createLocalRepository(d, { clock: () => clock });
+    const rows = (await repo.createBackup()).tables.bill_occurrences!;
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.status_changed_at]))).toEqual({ o1: '2026-09-01T15:00:00.000Z', o2: null });
+  });
+
+  it('restoring a schema-1 backup derives status times too', async () => {
+    const b = await repo.createBill(bill());
+    const [first] = await repo.listBillOccurrences({ billId: b.id });
+    await repo.completeBillOccurrence(first!.id, {});
+    const backup = await repo.createBackup();
+    const old = { ...backup, schemaVersion: 1, tables: { ...backup.tables, bill_occurrences: backup.tables.bill_occurrences!.map(({ status_changed_at: _s, ...r }) => r) } };
+    await fresh();
+    await repo.restoreBackup(JSON.parse(JSON.stringify(old)));
+    const row = (await repo.createBackup()).tables.bill_occurrences!.find((r) => r.id === first!.id)!;
+    expect(row.status_changed_at).toBe(row.completed_at);
   });
 });
 

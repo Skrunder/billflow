@@ -14,7 +14,7 @@ import { clearAuthCookies, hashPassword, publicUser, revokeAllSessions, verifyPa
 export const usersRouter = Router();
 
 function serializeSettings(s: Awaited<ReturnType<typeof getSettings>>) {
-  const { userId: _userId, updatedAt, ...rest } = s;
+  const { userId: _userId, syncXid: _syncXid, updatedAt, ...rest } = s;
   return { ...rest, updatedAt: updatedAt.toISOString() };
 }
 

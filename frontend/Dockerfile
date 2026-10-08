@@ -23,7 +23,8 @@ COPY frontend frontend
 RUN npm run build -w frontend
 
 FROM nginxinc/nginx-unprivileged:${NGINX_VERSION} AS runtime
-ARG APP_VERSION=1.0.0
+# Optional override; the version normally comes from package.json.
+ARG APP_VERSION=
 ENV BACKEND_URL=http://backend:4000 \
     NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
     NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d

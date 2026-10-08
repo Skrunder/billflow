@@ -195,42 +195,103 @@ export async function login(email: string, password: string, info: ClientInfo): 
 
 // ──────────────────────────────────────────── refresh rotation ──
 
-export async function rotateRefreshToken(res: Response, token: string | undefined, info: ClientInfo) {
+/**
+ * Checks a refresh token and retires it, returning the session to continue.
+ * A token that was rotated long ago is being replayed (stolen): the whole
+ * family is revoked. One rotated moments ago is a benign race:
+ *   - 'retry' (browser): the other tab already holds the new cookie, so 409
+ *   - 'reissue' (phone): the app most likely lost the response to its last
+ *     refresh, so whatever was issued since is retired and a new token issued
+ */
+async function consumeRefreshToken(token: string | undefined, info: ClientInfo, onRecentReuse: 'retry' | 'reissue') {
   if (!token) throw unauthorized('No session');
   const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, include: { user: true } });
   if (!session) throw unauthorized('Session not found');
 
   if (session.revokedAt) {
-    if (Date.now() - session.revokedAt.getTime() < ROTATION_GRACE_MS) {
-      // Another tab rotated this token moments ago; the browser already has
-      // the new cookie, so the client simply retries.
-      throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
+    if (Date.now() - session.revokedAt.getTime() >= ROTATION_GRACE_MS) {
+      await prisma.session.updateMany({
+        where: { familyId: session.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await audit(prisma, {
+        userId: session.userId,
+        entityType: 'SESSION',
+        entityId: session.familyId,
+        action: 'REFRESH_TOKEN_REUSE_DETECTED',
+        metadata: { ip: info.ip ?? null },
+      });
+      logger.warn({ userId: session.userId }, 'refresh token reuse detected — session family revoked');
+      throw unauthorized('Session revoked');
     }
-    // A long-rotated token being replayed means it was stolen: kill the family.
-    await prisma.session.updateMany({
-      where: { familyId: session.familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    if (onRecentReuse === 'retry') throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
+    // Delete (not just revoke) what was issued since: those tokens never reached the phone,
+    // so anyone presenting one later finds no session at all.
+    const issuedSince = await prisma.session.deleteMany({
+      where: { familyId: session.familyId, createdAt: { gt: session.createdAt } },
     });
-    await audit(prisma, {
-      userId: session.userId,
-      entityType: 'SESSION',
-      entityId: session.familyId,
-      action: 'REFRESH_TOKEN_REUSE_DETECTED',
-      metadata: { ip: info.ip ?? null },
-    });
-    logger.warn({ userId: session.userId }, 'refresh token reuse detected — session family revoked');
-    throw unauthorized('Session revoked');
+    if (!issuedSince.count) throw unauthorized('Session revoked');
   }
   if (session.expiresAt < new Date()) throw unauthorized('Session expired');
   if (!session.user.isActive) throw unauthorized('Account disabled');
 
-  const revoked = await prisma.session.updateMany({
-    where: { id: session.id, revokedAt: null },
-    data: { revokedAt: new Date(), lastUsedAt: new Date() },
-  });
-  if (!revoked.count) throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
+  if (!session.revokedAt) {
+    const revoked = await prisma.session.updateMany({
+      where: { id: session.id, revokedAt: null },
+      data: { revokedAt: new Date(), lastUsedAt: new Date() },
+    });
+    if (!revoked.count && onRecentReuse === 'retry') throw new AppError(409, 'TOKEN_ROTATED', 'Session was just refreshed; retry');
+  }
+  return session;
+}
 
+export async function rotateRefreshToken(res: Response, token: string | undefined, info: ClientInfo) {
+  const session = await consumeRefreshToken(token, info, 'retry');
   return issueTokens(res, session.user, info, session.familyId);
+}
+
+// ─────────────────────────────────────────── native app (phones) ──
+// The Android app has no cookies: it keeps the refresh token in the response
+// body and in its own storage. Each sign-in is a device (see sync).
+
+export async function issueNativeTokens(user: User, info: ClientInfo, familyId: string) {
+  const refreshToken = await createSession(user.id, info, familyId);
+  return {
+    accessToken: signAccessToken({ sub: user.id, role: user.role, tv: user.tokenVersion }),
+    expiresIn: env.ACCESS_TOKEN_TTL_MINUTES * 60,
+    refreshToken,
+    user: publicUser(user),
+  };
+}
+
+export async function nativeLogin(email: string, password: string, deviceName: string, info: ClientInfo) {
+  const user = await login(email, password, info);
+  const familyId = crypto.randomUUID();
+  const device = await prisma.device.create({ data: { userId: user.id, name: deviceName, sessionFamilyId: familyId } });
+  await audit(prisma, { userId: user.id, entityType: 'USER', entityId: user.id, action: 'DEVICE_ADDED', metadata: { deviceId: device.id, name: deviceName } });
+  return { ...(await issueNativeTokens(user, info, familyId)), deviceId: device.id };
+}
+
+export async function rotateNativeRefreshToken(token: string | undefined, info: ClientInfo) {
+  const session = await consumeRefreshToken(token, info, 'reissue');
+  const device = await prisma.device.findUnique({ where: { sessionFamilyId: session.familyId } });
+  if (!device || device.revokedAt) throw unauthorized('This device was signed out');
+  return { ...(await issueNativeTokens(session.user, info, session.familyId)), deviceId: device.id };
+}
+
+/** Signs a device out: its whole session family and the device record. */
+export async function revokeDevice(familyId: string) {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.session.updateMany({ where: { familyId, revokedAt: null }, data: { revokedAt: now } }),
+    prisma.device.updateMany({ where: { sessionFamilyId: familyId, revokedAt: null }, data: { revokedAt: now } }),
+  ]);
+}
+
+export async function nativeLogout(token: string | undefined) {
+  if (!token) return;
+  const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, select: { familyId: true } });
+  if (session) await revokeDevice(session.familyId);
 }
 
 export async function revokeRefreshToken(token: string | undefined) {

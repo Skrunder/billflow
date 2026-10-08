@@ -20,6 +20,7 @@ import { eventOccurrencesRouter } from './modules/events/eventOccurrences.routes
 import { eventsRouter } from './modules/events/events.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { notificationsRouter, pushRouter } from './modules/notifications/notifications.routes';
+import { syncRouter } from './modules/sync/sync.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 function parseTrustProxy(value: string): boolean | number | string {
@@ -34,6 +35,8 @@ export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
+  // Safety net: internal sync bookkeeping (BigInt columns) never reaches API responses.
+  app.set('json replacer', (key: string, value: unknown) => (key === 'syncXid' ? undefined : typeof value === 'bigint' ? value.toString() : value));
   // Correct client IPs / protocol behind Nginx Proxy Manager, Traefik, Cloudflare Tunnel, …
   app.set('trust proxy', parseTrustProxy(env.TRUST_PROXY));
 
@@ -63,7 +66,10 @@ export function createApp() {
     app.use(cors({ origin: env.corsOrigins, credentials: true }));
   }
 
-  app.use(express.json({ limit: '100kb' }));
+  // Sync pushes carry up to a few thousand rows; everything else stays small.
+  const smallJson = express.json({ limit: '100kb' });
+  const syncJson = express.json({ limit: '8mb' });
+  app.use((req, res, next) => (req.path === '/api/v1/sync/push' ? syncJson : smallJson)(req, res, next));
   app.use(cookieParser());
   app.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -89,6 +95,7 @@ export function createApp() {
   secured.use('/notifications', notificationsRouter);
   secured.use('/push', pushRouter);
   secured.use('/audit', auditRouter);
+  secured.use('/sync', syncRouter);
   api.use(secured);
 
   app.use('/api/v1', api);

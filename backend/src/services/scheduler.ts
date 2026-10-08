@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { processAutopay } from './autopay.service';
 import { ensureGenerated } from './occurrence.service';
 import { dispatchReminders, planReminders, pruneNotifications } from './reminder.service';
+import { pruneSyncData } from './sync.service';
 
 /**
  * In-process background jobs. All jobs are idempotent, so running more than
@@ -42,7 +43,7 @@ export function startScheduler(): void {
     });
   const autopay = () => runJob('autopay', processAutopay);
   const horizon = () => runJob('horizon', extendAllHorizons);
-  const prune = () => runJob('prune', pruneNotifications);
+  const prune = () => runJob('prune', async () => ({ notifications: await pruneNotifications(), sync: await pruneSyncData() }));
 
   timers.push(setInterval(reminders, minute));
   timers.push(setInterval(autopay, 5 * minute));

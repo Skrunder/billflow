@@ -17,7 +17,7 @@ import type { SqlDriver } from './driver';
  * On Android each script is split into statements on `;` (native-driver.ts),
  * so scripts must not contain triggers or string literals with `;` or `--`.
  */
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   // 1 — initial schema
   `
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -189,6 +189,15 @@ const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  `,
+
+  // 2 — when each occurrence's status last changed (same as the server's
+  // status_changed_at; sync uses it so an edit can't undo a completion)
+  `
+  ALTER TABLE bill_occurrences ADD COLUMN status_changed_at TEXT;
+  ALTER TABLE event_occurrences ADD COLUMN status_changed_at TEXT;
+  UPDATE bill_occurrences SET status_changed_at = COALESCE(completed_at, updated_at) WHERE status <> 'PENDING';
+  UPDATE event_occurrences SET status_changed_at = COALESCE(completed_at, cancelled_at, updated_at) WHERE status <> 'UPCOMING';
   `,
 ];
 

@@ -12,12 +12,13 @@ const ACTION_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
   REOPENED: 'Reopened',
   AUTOPAY_COMPLETED: 'Completed by auto-pay',
+  SYNC_CONFLICT: 'Changed on two devices; newest kept',
   ARCHIVED: 'Series ended',
   UNARCHIVED: 'Series resumed',
   DELETED: 'Deleted',
 };
 
-const HIDDEN = new Set(['updatedAt', 'isModified', 'dueAt', 'startAt', 'endAt', 'autopayAt', 'scheduledPayDate', 'generatedUntil']);
+const HIDDEN = new Set(['statusChangedAt', 'updatedAt', 'isModified', 'dueAt', 'startAt', 'endAt', 'autopayAt', 'scheduledPayDate', 'generatedUntil']);
 
 function show(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';

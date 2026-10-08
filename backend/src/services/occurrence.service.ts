@@ -10,6 +10,7 @@ import {
   fromIsoDate,
   horizonDate as coreHorizonDate,
   initialGenerationRange,
+  occurrenceId,
   planReconcile,
   regenerationRange,
   toIsoDate,
@@ -81,6 +82,8 @@ async function insertBillOccurrences(db: Db, bill: Bill, settings: UserSettings,
   if (dates.length) {
     await db.billOccurrence.createMany({
       data: dates.map((d) => ({
+        // Deterministic, so the server and phones create the same id for the same slot.
+        id: occurrenceId(bill.id, d),
         billId: bill.id,
         userId: bill.userId,
         originalDueDate: fromIsoDate(d),
@@ -99,6 +102,7 @@ async function insertEventOccurrences(db: Db, event: Event, settings: UserSettin
   if (dates.length) {
     await db.eventOccurrence.createMany({
       data: dates.map((d) => ({
+        id: occurrenceId(event.id, d),
         eventId: event.id,
         userId: event.userId,
         originalDate: fromIsoDate(d),

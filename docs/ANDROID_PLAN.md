@@ -2,7 +2,7 @@
 
 **Goal:** an installable Android APK that works fully on the phone with no server, no account and no internet. Users can optionally connect it to their self-hosted server, and the phone and web app then share the same data in both directions.
 
-**Status:** M1–M4 done: the standalone Android app (1.1.0) builds, installs and runs with no server. See `ANDROID.md` for building and installing. Next: M5, server sync support.
+**Status:** M1–M5 done. The standalone Android app (1.1.0) builds, installs and runs with no server (`ANDROID.md`); the server now has sync and native sign-in (`API.md`, "Sync"). Next: M6, sync in the app.
 
 ---
 
@@ -39,8 +39,8 @@
 | Local database | SQLite via `@capacitor-community/sqlite`; `sql.js` in the browser for development and tests |
 | Occurrence ids | **Deterministic**: `UUIDv5(templateId + originalDate)`. The phone and server generate the *same* id for the same slot, so offline generation never creates duplicates. Merging also matches on `(templateId, originalDate)` as a safety net for existing rows. |
 | Independence rule | Unchanged: every occurrence is its own row with its own status and history, locally and on the server |
-| Deletes | Soft deletes ("tombstones", `deleted_at`) on synced tables, so deletions propagate. Purged after all devices have synced. |
-| Change tracking | Server: per-user monotonically increasing `sync_seq` on every changed row. Phone: local outbox of pending changes. |
+| Deletes | Server: an AFTER DELETE trigger writes a tombstone (`sync_tombstones`) for every deleted synced row, so deletions propagate. Purged after 180 days. |
+| Change tracking | Server: a trigger stamps every changed row with its transaction id (`sync_xid`); pulls use the snapshot xmin as cursor so late commits are never missed. Phone: local outbox of pending changes. |
 | Conflicts | Last writer wins per record, by modification time, with two protections: (1) a *completion* or *skip* is never silently lost to a mere edit from another device; an explicit *reopen* is the only thing that overrides it. (2) Both versions are written to the occurrence's audit history so nothing disappears without a trace. |
 | Reminders | Scheduled **on the device** with Android notifications, so they work with no server. When a phone is connected to a server, server push to that device is turned off to avoid double reminders (in-app and email on the server still work). |
 | Auto-pay | Runs locally on app open and in the background. Idempotent, so device and server can't double-complete. |
@@ -78,10 +78,10 @@
 * Docker-based build script and signing-keystore setup.
 * **Result:** an APK you can install and use daily with no server.
 
-### M5 · Server sync support
-* Database migration: `deleted_at`, `sync_seq`, `client_modified_at` on synced tables; a `devices` table.
+### M5 · Server sync support ✅ done
+* Database migration: `sync_xid` stamped by triggers on every synced table, `sync_tombstones` written by delete triggers, `status_changed_at` on occurrences, `devices` and `sync_batches` tables. (Built with triggers instead of soft deletes, so no existing server query had to change.)
 * Switch the server to deterministic occurrence ids for new rows. Existing rows keep their ids and are matched by `(templateId, originalDate)`.
-* Endpoints: `POST /api/v1/sync/push` (batched changes, idempotent by change id), `GET /api/v1/sync/pull?since=<seq>`, and native auth (`/auth/native/login`, `/auth/native/refresh`, `/auth/native/logout`).
+* Endpoints: `POST /api/v1/sync/push` (batched changes, idempotent by batch id), `GET /api/v1/sync/pull?since=<cursor>`, `GET/DELETE /api/v1/sync/devices`, and native auth (`/auth/native/login`, `/auth/native/refresh`, `/auth/native/logout`).
 * Web app keeps working exactly as before, and edits made on the web are picked up by phones.
 * Integration tests: two simulated devices plus web edits, covering conflicts, deletes and offline catch-up.
 

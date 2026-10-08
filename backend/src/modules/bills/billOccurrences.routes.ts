@@ -41,7 +41,8 @@ async function transition(
 ) {
   const me = currentUser(req);
   await prisma.$transaction(async (tx) => {
-    await tx.billOccurrence.update({ where: { id: occ.id }, data });
+    // Status changes are stamped so sync can tell a completion from a plain edit.
+    await tx.billOccurrence.update({ where: { id: occ.id }, data: 'status' in data ? { ...data, statusChangedAt: new Date() } : data });
     await audit(tx, {
       userId: me.id,
       entityType: 'BILL_OCCURRENCE',

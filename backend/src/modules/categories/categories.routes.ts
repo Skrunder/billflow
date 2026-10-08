@@ -17,19 +17,22 @@ categoriesRouter.get('/', async (req, res) => {
     include: { _count: { select: { bills: true, events: true } } },
   });
   res.json(
-    categories.map(({ _count, userId: _u, ...c }) => ({
-      ...c,
-      usageCount: c.type === 'BILL' ? _count.bills : _count.events,
+    categories.map(({ _count, ...row }) => ({
+      ...categoryJson(row),
+      usageCount: row.type === 'BILL' ? _count.bills : _count.events,
     })),
   );
 });
+
+/** API shape: the row without owner and sync bookkeeping. */
+const categoryJson = <T extends { userId: string; syncXid: bigint }>({ userId: _u, syncXid: _x, ...c }: T) => c;
 
 categoriesRouter.post('/', async (req, res) => {
   const me = currentUser(req);
   const body = parse(createInput, req.body);
   const category = await prisma.category.create({ data: { ...body, userId: me.id } });
   await audit(prisma, { userId: me.id, entityType: 'CATEGORY', entityId: category.id, action: 'CREATED', changes: body });
-  res.status(201).json(category);
+  res.status(201).json(categoryJson(category));
 });
 
 categoriesRouter.patch('/:id', async (req, res) => {
@@ -39,7 +42,7 @@ categoriesRouter.patch('/:id', async (req, res) => {
   const result = await prisma.category.updateMany({ where: { id, userId: me.id }, data: body });
   if (!result.count) throw notFound('Category');
   await audit(prisma, { userId: me.id, entityType: 'CATEGORY', entityId: id, action: 'UPDATED', changes: body });
-  res.json(await prisma.category.findUniqueOrThrow({ where: { id } }));
+  res.json(categoryJson(await prisma.category.findUniqueOrThrow({ where: { id } })));
 });
 
 /** Deleting a category never deletes bills/events — they become uncategorised. */

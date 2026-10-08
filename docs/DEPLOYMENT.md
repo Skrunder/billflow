@@ -107,6 +107,8 @@ APP_URL=https://bills.example.com     # enables Secure cookies automatically
 
 and recreate with `docker compose up -d`. Forwarded headers from private-network proxies are trusted by default (`TRUST_PROXY`), so rate limiting and audit logs see real client IPs. If your proxy is on a public IP, add it: `TRUST_PROXY=loopback, uniquelocal, 203.0.113.10`.
 
+> **Android app sync:** phones upload changes in requests of up to 8 MB. Most proxies allow that, but nginx-based ones default to 1 MB: raise it (`client_max_body_size 8m;`; in Nginx Proxy Manager under *Advanced*) or a first sync with lots of data fails with "413 Request Entity Too Large".
+
 > To expose the app **only** through the proxy, set `APP_BIND_ADDRESS=127.0.0.1` (proxy on the same host), or remove `ports:` and attach the frontend to the proxy's Docker network.
 
 ### Nginx Proxy Manager
@@ -150,6 +152,8 @@ server {
     ssl_certificate     /etc/letsencrypt/live/bills.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/bills.example.com/privkey.pem;
     add_header Strict-Transport-Security "max-age=31536000" always;
+
+    client_max_body_size 8m;   # Android app sync uploads
 
     location / {
         proxy_pass http://127.0.0.1:8080;

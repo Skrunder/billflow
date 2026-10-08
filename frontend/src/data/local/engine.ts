@@ -570,7 +570,8 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
       [now().toISOString()],
     );
     for (const o of due) {
-      await update('bill_occurrences', o.id, { status: 'COMPLETED', completedAt: o.autopayAt, amountPaid: o.amount, updatedAt: now().toISOString() });
+      const stamp = now().toISOString();
+      await update('bill_occurrences', o.id, { status: 'COMPLETED', completedAt: o.autopayAt, amountPaid: o.amount, statusChangedAt: stamp, updatedAt: stamp });
       await audit('BILL_OCCURRENCE', o.id, 'AUTOPAY_COMPLETED', { status: { from: 'PENDING', to: 'COMPLETED' } }, 'SYSTEM');
       await outbox('BILL_OCCURRENCE', o.id);
     }
@@ -712,6 +713,9 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
         await run(`INSERT INTO ${t} (${entries.map(([k]) => k).join(', ')}) VALUES (${entries.map(() => '?').join(', ')})`, entries.map(([, v]) => v as SqlValue));
       }
     }
+    // Backups from before schema 2 have no status_changed_at: derive it like that migration did.
+    await run(`UPDATE bill_occurrences SET status_changed_at = COALESCE(completed_at, updated_at) WHERE status <> 'PENDING' AND status_changed_at IS NULL`);
+    await run(`UPDATE event_occurrences SET status_changed_at = COALESCE(completed_at, cancelled_at, updated_at) WHERE status <> 'UPCOMING' AND status_changed_at IS NULL`);
     // Pick up anything the backup's age left behind (horizon, auto-pay, due reminders).
     await maintenance();
   }
@@ -796,14 +800,16 @@ export async function createLocalRepository(db: SqlDriver, options: LocalReposit
   /** Single-row occurrence change + its own audit entry. */
   async function transitionBill(o: BillOccurrenceModel, patch: Partial<BillOccurrenceModel>, action: string) {
     const changes = diff(o, patch);
-    await update('bill_occurrences', o.id, { ...patch, updatedAt: now().toISOString() });
+    const stamp = now().toISOString();
+    await update('bill_occurrences', o.id, { ...patch, ...('status' in patch ? { statusChangedAt: stamp } : {}), updatedAt: stamp });
     await audit('BILL_OCCURRENCE', o.id, action, changes);
     await outbox('BILL_OCCURRENCE', o.id);
   }
 
   async function transitionEvent(o: EventOccurrenceModel, patch: Partial<EventOccurrenceModel>, action: string) {
     const changes = diff(o, patch);
-    await update('event_occurrences', o.id, { ...patch, updatedAt: now().toISOString() });
+    const stamp = now().toISOString();
+    await update('event_occurrences', o.id, { ...patch, ...('status' in patch ? { statusChangedAt: stamp } : {}), updatedAt: stamp });
     await audit('EVENT_OCCURRENCE', o.id, action, changes);
     await outbox('EVENT_OCCURRENCE', o.id);
   }

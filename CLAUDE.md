@@ -19,6 +19,7 @@ SKR's Bill Calendar: a self-hosted bill and event calendar. npm-workspaces monor
 7. **Screens never call the server directly.** UI code uses the hooks in `frontend/src/api/hooks.ts`, which go through `DataRepository` (`frontend/src/data/`). New data operations must be added to the interface *and* to every implementation, plus the contract test in `frontend/src/data/remote.test.ts`. Server-only account features belong in `frontend/src/data/account.ts`.
 8. Buttons inside forms must have an explicit `type`. A bare `<button>` submits the form.
 9. **Server and device engines must stay in step.** Any change to how the API behaves (`backend/src/modules`, `backend/src/services`) needs the same change in the on-device engine (`frontend/src/data/local/engine.ts`, plus a new step in `schema.ts` for data-shape changes), with tests on both sides. Shared rules go in `@skr/core`, not into either engine.
+10. **Sync** (`/api/v1/sync`, `packages/core/src/sync.ts`): new columns on synced tables must be added to the sync record schema, the server mappers (`backend/src/services/sync.mappers.ts`) and the phone. API responses must never include `syncXid` (it's a BigInt).
 
 ## Commands
 ```bash

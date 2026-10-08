@@ -13,3 +13,4 @@ export * from './format.js';
 export * from './schemas.js';
 export * from './defaults.js';
 export * from './ids.js';
+export * from './sync.js';

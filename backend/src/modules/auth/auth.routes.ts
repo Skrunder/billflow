@@ -12,11 +12,14 @@ import {
   clearAuthCookies,
   issueTokens,
   login,
+  nativeLogin,
+  nativeLogout,
   register,
   requestPasswordReset,
   resetPassword,
   revokeAllSessions,
   revokeRefreshToken,
+  rotateNativeRefreshToken,
   rotateRefreshToken,
   sendVerificationEmail,
   verificationRequired,
@@ -84,6 +87,29 @@ authRouter.post('/logout-all', requireAuth, async (req, res) => {
   await revokeAllSessions(user.id);
   await audit(prisma, { userId: user.id, entityType: 'USER', entityId: user.id, action: 'LOGOUT_ALL' });
   clearAuthCookies(res);
+  res.status(204).end();
+});
+
+// ── Android app: tokens in the body instead of cookies (no CSRF needed: nothing is sent automatically) ──
+
+const refreshBody = z.object({ refreshToken: z.string().min(20).max(200) });
+
+authRouter.post('/native/login', authLimiter, async (req, res) => {
+  const body = parse(
+    z.object({ email, password: z.string().min(1).max(200), deviceName: trimmed(80).min(1).default('Android phone') }),
+    req.body,
+  );
+  res.json(await nativeLogin(body.email, body.password, body.deviceName, clientInfo(req)));
+});
+
+authRouter.post('/native/refresh', authLimiter, async (req, res) => {
+  const body = parse(refreshBody, req.body);
+  res.json(await rotateNativeRefreshToken(body.refreshToken, clientInfo(req)));
+});
+
+authRouter.post('/native/logout', async (req, res) => {
+  const body = parse(refreshBody, req.body);
+  await nativeLogout(body.refreshToken);
   res.status(204).end();
 });
 
